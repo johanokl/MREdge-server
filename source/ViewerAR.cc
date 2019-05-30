@@ -69,9 +69,10 @@ void ViewerAR::Run()
   int slamStatus;
   vector<cv::KeyPoint> vKeys;
   vector<ORB_SLAM2::MapPoint*> vMPs;
+  quint32 frameid;
 
   while (mRunning) {
-    getImagePose(im, Tcw, slamStatus, vKeys, vMPs);
+    getImagePose(frameid, im, Tcw, slamStatus, vKeys, vMPs);
     if (!im.empty()) {
       mWidth = im.cols;
       mHeight = im.rows;
@@ -119,13 +120,9 @@ void ViewerAR::Run()
 #endif
   vector<Plane*> m3dObjectPoses;
 
-  long loop = 0;
-
   mpSystem->DeactivateLocalizationMode();
 
   while (mRunning) {
-    loop++;
-
 #ifndef DISABLE_IMAGE_OUTPUT
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -140,7 +137,7 @@ void ViewerAR::Run()
     int arData = 0;
 
     // Get last image and its computed pose from SLAM
-    getImagePose(im, Tcw, slamStatus, vKeys, vMPs);
+    getImagePose(frameid, im, Tcw, slamStatus, vKeys, vMPs);
 
 #ifndef DISABLE_IMAGE_OUTPUT
     glColor3f(1.0, 1.0, 1.0);
@@ -288,7 +285,7 @@ void ViewerAR::Run()
     }
 #endif
 #endif
-    emit newImageReady(outImage, arData);
+    emit newImageReady(frameid, outImage, arData);
 
 #ifndef USE_QMUTEX_AR
     usleep(mT * 1000);
@@ -309,10 +306,13 @@ void ViewerAR::Run()
  * @param vKeys
  * @param vMPs
  */
-void ViewerAR::setImagePose(const cv::Mat &im, const cv::Mat &Tcw, const int &status, const vector<cv::KeyPoint> &vKeys, const vector<ORB_SLAM2::MapPoint*> &vMPs)
+void ViewerAR::setImagePose(
+    quint32 id, const cv::Mat &im, const cv::Mat &Tcw, const int &status,
+    const vector<cv::KeyPoint> &vKeys, const vector<ORB_SLAM2::MapPoint*> &vMPs)
 {
   mMutexPoseImage.lock();
   mPoseReady = true;
+  mFrameId = id;
   mImage = im.clone();
   mTcw = Tcw.clone();
   mStatus = status;
@@ -346,7 +346,9 @@ void ViewerAR::Stop()
  * @param vKeys
  * @param vMPs
  */
-void ViewerAR::getImagePose(cv::Mat &im, cv::Mat &Tcw, int &status, std::vector<cv::KeyPoint> &vKeys, std::vector<ORB_SLAM2::MapPoint*> &vMPs)
+void ViewerAR::getImagePose(
+    quint32 &frameid, cv::Mat &im, cv::Mat &Tcw, int &status,
+    std::vector<cv::KeyPoint> &vKeys, std::vector<ORB_SLAM2::MapPoint*> &vMPs)
 {
   mMutexPoseImage.lock();
 #ifdef USE_QMUTEX_AR
@@ -355,6 +357,7 @@ void ViewerAR::getImagePose(cv::Mat &im, cv::Mat &Tcw, int &status, std::vector<
   }
 #endif
   mPoseReady = false;
+  frameid = mFrameId;
   im = mImage.clone();
   Tcw = mTcw.clone();
   status = mStatus;

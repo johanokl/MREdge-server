@@ -52,8 +52,6 @@ int main(int argc, char *argv[])
   quint16 tcpPort = 39200;
   quint16 udpPort = 39585;
 
-  bool benchmarking = false;
-
   QCommandLineOption tcpOption(
         QStringList() << "t" << "tcp",
         QString("TCP port number. Default is %1.")
@@ -104,6 +102,11 @@ int main(int argc, char *argv[])
         "Test the video stack using only the canny filter.");
   parser.addOption(cannyFilterOption);
 
+  QCommandLineOption echoImageOption(
+        QStringList() << "e" << "echoimage",
+        "Don't modify the received image, just return it.");
+  parser.addOption(echoImageOption);
+
   QCommandLineOption benchmarkingOption(
         QStringList() << "b" << "benchmarking",
         "Fill the screen with solid colors when point cloud or AR objects are visible.");
@@ -116,6 +119,11 @@ int main(int argc, char *argv[])
         "id");
   parser.addOption(replaceVideoInOption);
 
+  QCommandLineOption logTimeOption(
+        QStringList() << "l" << "logtime",
+        "Log the time and print results after 60 seconds.");
+  parser.addOption(logTimeOption);
+
   parser.process(app);
 
   if (parser.isSet(tcpOption)) {
@@ -124,16 +132,15 @@ int main(int argc, char *argv[])
   if (parser.isSet(udpOption)) {
     udpPort = parser.value(udpOption).toUShort();
   }
-  if (parser.isSet(benchmarkingOption)) {
-    benchmarking = true;
-  }
-
   QString vocPath = "";
   if (parser.isSet(vocOption)) {
     vocPath = parser.value(vocOption);
   }
 
+  bool benchmarkingOptionEnabled = parser.isSet(benchmarkingOption);
   bool displayOptionEnabled = parser.isSet(displayOption);
+  bool logTimeOptionEnabled = parser.isSet(logTimeOption);
+
 #ifndef ENABLE_WIDGET_SUPPORT
   if (displayOptionEnabled) {
     qDebug() << "*** MREdgeServer has not been compiled with widget support and can't support parameter --display";
@@ -141,11 +148,23 @@ int main(int argc, char *argv[])
   }
 #endif
 
-  MRServer myServer(tcpPort, udpPort, vocPath, benchmarking);
+  MRServer myServer;
 
-    if (displayOptionEnabled) {
-      myServer.setDisplayResults(true);
-    }
+  myServer.setBenchmarkingMode(benchmarkingOptionEnabled);
+  myServer.setLogTime(logTimeOptionEnabled);
+  myServer.setDisplayResults(displayOptionEnabled);
+
+  if (parser.isSet(cannyFilterOption)) {
+    fDebug << "Using CANNY FILTER";
+    myServer.setMixedRealityFramework(MRServer::CANNYFILTER);
+  } else if (parser.isSet(echoImageOption)) {
+    fDebug << "Using ECHO IMAGE";
+    myServer.setMixedRealityFramework(MRServer::ECHOIMAGE);
+  } else {
+    myServer.loadVoc(vocPath);
+  }
+
+  myServer.startServer(tcpPort, udpPort);
 
   if (parser.isSet(writerOption)) {
     myServer.addFilewriter(parser.value(writerOption));
@@ -161,12 +180,6 @@ int main(int argc, char *argv[])
     myServer.forceVideoInputFromCamera(parser.value(replaceVideoInOption));
     fDebug << "Replacing end device's input with feed from camera "
            << parser.value(replaceVideoInOption);
-  }
-  if (parser.isSet(displayOption)) {
-    myServer.setDisplayResults(true);
-  }
-  if (parser.isSet(cannyFilterOption)) {
-    myServer.setMixedRealityFramework(MRServer::CANNYFILTER);
   }
 
   return app.exec();

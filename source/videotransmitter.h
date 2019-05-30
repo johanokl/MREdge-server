@@ -14,6 +14,8 @@
 #include "global.h"
 #include "videostreamer.h"
 
+class QElapsedTimer;
+
 namespace MREdge {
 
 class GStreamerTransmitter;
@@ -32,11 +34,14 @@ public:
   void setImageSize(QSize size);
   quint16 getPort() override { return mDestPort; }
   void setBitrate(int bitrate);
+  QMap<quint32, qint64> getProcessingTimes() const;
 
 public slots:
-  void addQImageToProcessQueue(qint32 , QImagePtr);
-  void processQImage(qint32, QImagePtr image);
+  void addQImageToProcessQueue(qint32 , quint32, QImagePtr);
+  void processQImage(qint32, quint32, QImagePtr);
   void writeLog();
+  void setLogTime(bool enable, QElapsedTimer* timer=nullptr) {
+    mLogTime = enable; mUptime=timer; }
 
 signals:
   void startTransmitter(QString, quint16, VideoStreamer::Format,
@@ -56,6 +61,10 @@ private:
   QSize mImageSize;
   int mBitrate;
   QTimer *mWriteLogTimer;
+  QElapsedTimer* mUptime;
+  bool mLogTime = false;
+  QMap<quint32, qint64> mFramesProcessedNsec;
+
 };
 
 class GStreamerTransmitter : public QObject {

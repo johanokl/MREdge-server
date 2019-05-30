@@ -43,6 +43,9 @@ public:
   QMap<int, int> frames_processed_per_time_slice;
 };
 
+
+
+
 /**
  * @brief VideoTransmitter::VideoTransmitter
  * @param session Session id.
@@ -60,6 +63,7 @@ VideoTransmitter::VideoTransmitter(qint32 session, QString destHost)
   mGStreamerTransmitter = new GStreamerTransmitter();
   mGStreamerTransmitter->moveToThread(new QThread());
   mGStreamerTransmitter->thread()->start();
+  mUptime = nullptr;
 
   mWriteLogTimer = new QTimer(this);
   connect(mWriteLogTimer, &QTimer::timeout,
@@ -182,11 +186,12 @@ void VideoTransmitter::init()
  * @param session Session id.
  * @param image New video frame to add to the streamer's buffer.
  */
-void VideoTransmitter::addQImageToProcessQueue(qint32 session, QImagePtr image)
+void VideoTransmitter::addQImageToProcessQueue(qint32 session, quint32 frameid, QImagePtr image)
 {
   if (!mStreamContext || !mStreamContext->initialized || session != mSession) {
     return;
   }
+  Q_UNUSED(frameid);
   mMutex.lock();
   if (!mImage.isNull()) {
     fDebug << "addQImageToProcessQueue: Buffer not empty. Replace image.";
@@ -203,17 +208,18 @@ void VideoTransmitter::addQImageToProcessQueue(qint32 session, QImagePtr image)
  * Sends the image to GStreamer's inbox, to be encoded and transmitted using
  * the configured streaming format.
  */
-void VideoTransmitter::processQImage(qint32 session, QImagePtr image)
+void VideoTransmitter::processQImage(qint32 session, quint32 frameid, QImagePtr image)
 {
   if (!mStreamContext || !mStreamContext->initialized || session != mSession) {
     return;
   }
+  Q_UNUSED(frameid);
   mMutex.lock();
   image = mImage;
   mImage.clear();
   mMutex.unlock();
   if (image.isNull()) {
-    fDebug << "Image is null";
+    fDebug << "Frame skipped. Inflow faster than they could be processed.";
     return;
   }
   if (mStreamContext->videoSize != image->size()) {
@@ -233,7 +239,25 @@ void VideoTransmitter::processQImage(qint32 session, QImagePtr image)
   auto result = gst_app_src_push_buffer(mStreamContext->appsrc, buffer);
   auto time_slice = mStreamContext->timer.elapsed() / 1000;
   mStreamContext->frames_processed_per_time_slice[time_slice] += 1;
-  fDebug << "Pushed image with status success=" << result;
+  if (mLogTime && mUptime) {
+    mFramesProcessedNsec.insert(frameid, mUptime->nsecsElapsed());
+  }
+  if (result == GST_FLOW_OK) {
+    //fDebug << "Image" << frameid << "successfully pushed.";
+  } else {
+    fDebug << "Failure when pushing image" << frameid;
+  }
+}
+
+/**
+ * @brief VideoTransmitter::getProcessingTimes
+ * @return
+ */
+QMap<quint32, qint64> VideoTransmitter::getProcessingTimes() const
+{
+  auto retMap = mFramesProcessedNsec;
+  retMap.detach();
+  return retMap;
 }
 
 /**
@@ -271,7 +295,6 @@ static void gstreamer_qos_callback(GstBus *, GstMessage *msg, GStreamerTransmitt
   g_clear_error(&err);
   g_free(debug_info);
 }
-
 
 /**
  * @brief GStreamerTransmitter::start

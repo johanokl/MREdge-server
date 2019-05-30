@@ -56,6 +56,27 @@ UdpConnection::~UdpConnection()
 }
 
 /**
+ * @brief UdpConnection::getProcessingTimes
+ * @param session
+ * @return QMap with frame id and nanosecond timestamp.
+ */
+QMap<quint32, qint64> UdpConnection::getProcessingTimes(qint32 session)
+{
+  return mUdpSender->getProcessingTimes(session);
+}
+
+/**
+ * @brief UdpConnection::setLogTime
+ * @param enable
+ * @param timer
+ */
+void UdpConnection::setLogTime(bool enable, QElapsedTimer* timer) {
+  mLogTime = enable;
+  mUptime = timer;
+  mUdpSender->setLogTime(enable, timer);
+}
+
+/**
  * @brief UdpConnection::setPacketSize
  * @param session Session id
  * @param packetsize Packet size for this session. [100-2000]
@@ -69,7 +90,6 @@ UdpConnection::~UdpConnection()
  */
 void UdpConnection::setPacketSize(qint32 session, qint32 packetsize)
 {
-  fDebug << "setPacketSize " << session << " " << packetsize;
   mSessionsMutex.lock();
   if (mSessions.contains(session)) {
     auto obj = mSessions.value(session);
@@ -177,7 +197,7 @@ void UdpConnection::readyRead()
           dstream.setByteOrder(QDataStream::BigEndian);
           qint32 session;
           dstream >> session;
-          fDebug << "Register TCP session id=" << session;
+          fDebug << "Register TCP session id:" << session;
           udpbuilder->setSession(session);
           mSessionsMutex.lock();
           if (mSessions.contains(session)) {

@@ -82,11 +82,13 @@ public:
     cy = static_cast<double>(cy_);
   }
 
-  void setImagePose(const cv::Mat &im, const cv::Mat &Tcw, const int &status,
-                    const std::vector<cv::KeyPoint> &vKeys, const std::vector<ORB_SLAM2::MapPoint*> &vMPs);
+  void setImagePose(
+      quint32 frameid, const cv::Mat &im, const cv::Mat &Tcw, const int &status,
+      const std::vector<cv::KeyPoint> &vKeys, const std::vector<ORB_SLAM2::MapPoint*> &vMPs);
 
-  void getImagePose(cv::Mat &im, cv::Mat &Tcw, int &status,
-                    std::vector<cv::KeyPoint> &vKeys,  std::vector<ORB_SLAM2::MapPoint*> &vMPs);
+  void getImagePose(
+      quint32 &frameid, cv::Mat &im, cv::Mat &Tcw, int &status,
+      std::vector<cv::KeyPoint> &vKeys,  std::vector<ORB_SLAM2::MapPoint*> &vMPs);
 
   void set3DObjectType(QString object);
   void add3DObject() {
@@ -102,7 +104,7 @@ public:
 signals:
   // Extend second parameter from int to larger data structure
   // if needed to store larger.
-  void newImageReady(QImagePtr image, int metadata);
+  void newImageReady(quint32 frameid, QImagePtr image, int metadata);
 
 private:
   void drawStatus(const int &status, const bool &bLocMode, cv::Mat &im);
@@ -135,6 +137,7 @@ private:
   bool mPoseReady = true;
   cv::Mat mTcw;
   cv::Mat mImage;
+  quint32 mFrameId;
   int mStatus;
   std::vector<cv::KeyPoint> mvKeys;
   std::vector<ORB_SLAM2::MapPoint*> mvMPs;

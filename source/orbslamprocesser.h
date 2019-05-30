@@ -58,7 +58,7 @@ public slots:
   void calibrateCamera() override;
 
 protected:
-  void process(qint32 session, cvMatPtr mat, int frameid) override;
+  void process(qint32 session, quint32 frameid, cvMatPtr mat) override;
 
 private:
   bool mCalibrateMode;
@@ -71,14 +71,12 @@ private:
   QSize mImgSize;
   ORB_SLAM2::ORBVocabulary *mVocabulary;
   ORB_SLAM2::System *mSLAM;
-  int mImagesSent;
   bool mBenchmarking;
   cv::Mat mK;
   cv::Mat mDistCoef;
   ViewerAR *mViewerAR;
   QString m3DObjectType;
   std::thread* mViewerARthread;
-  bool mRunning;
 };
 
 }

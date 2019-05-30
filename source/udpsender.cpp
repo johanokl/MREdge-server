@@ -9,6 +9,7 @@
 #include <QDataStream>
 #include <QUdpSocket>
 #include <QtMath>
+#include <QElapsedTimer>
 #include <mutex>
 
 namespace MREdge {
@@ -62,6 +63,18 @@ void UdpSender::sendFileUdp(qint32 session, QString host, quint16 port, qint32 p
   if (mSendBufferFiles.contains(session)) {
     file = mSendBufferFiles.take(session);
   }
+  if (mLogTime && mUptime) {
+    mTimeLogsMutex.lock();
+    if (!mTimeLogs.contains(session)) {
+      mTimeLogs.insert(session, new QMap<quint32, qint64>());
+    }
+    auto timelogs = mTimeLogs.value(session, nullptr);
+    if (timelogs) {
+      timelogs->insert(file.id, mUptime->nsecsElapsed());
+    }
+    mTimeLogsMutex.unlock();
+  }
+
   mSendBufferFilesMutex.unlock();
   if (file.data.isNull()) {
     // Nothing in send queue.
@@ -69,8 +82,8 @@ void UdpSender::sendFileUdp(qint32 session, QString host, quint16 port, qint32 p
     return;
   }
   // Take the latest file in the pipeline. As this function
-  fDebug << QString("Sending (session=%1, host=%2, port=%3, type=%4, length=%5)")
-            .arg(session).arg(host).arg(port).arg(file.type).arg(file.data->length());
+  // fDebug << QString("Sending (session=%1, host=%2, port=%3, type=%4, length=%5)")
+  //          .arg(session).arg(host).arg(port).arg(file.type).arg(file.data->length());
 
   qint32 offset = 0;
   qint32 totalbytes = file.data->length();

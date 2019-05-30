@@ -14,6 +14,7 @@
 #include "networkconnection.h"
 #include "videostreamer.h"
 
+class QElapsedTimer;
 
 namespace MREdge {
 
@@ -26,16 +27,19 @@ class VideoReceiver : public VideoStreamer {
 public:
   explicit VideoReceiver(qint32 session, QString senderip);
   ~VideoReceiver() override;
-  void start(Format format, bool useJitterbuffer);
   quint16 getPort() override { return mPort; }
-  void newMat(cvMatPtr image);
-  void statisticsUpdated(QJsonObject statJson);
   Format getFormat() { return mFormat; }
+  QMap<quint32, qint64> getProcessingTimes() const;
+
+public slots:
+  void start(Format format, bool useJitterbuffer);
+  void newMat(quint32 id, cvMatPtr image);
+  void setLogTime(bool enable, QElapsedTimer* timer=nullptr) {
+    mLogTime = enable; mUptime=timer; }
 
 signals:
   void startReceiver(Format format, QString senderip, bool useJitterbuffer);
   void ready(qint32 session, VideoStreamer::Format format, quint16 port);
-  void statistics(qint32 session, QJsonObject statistics);
 
 private:
   GStreamerReceiver *mGStreamerReceiver;
@@ -43,8 +47,10 @@ private:
   qint32 mSession;
   Format mFormat;
   quint16 mPort;
-  int mFramesSent = 0;
   QTimer *mWriteLogTimer;
+  QElapsedTimer* mUptime;
+  bool mLogTime = false;
+  QMap<quint32, qint64> mFramesArrivedNsec;
 };
 
 class GStreamerReceiver : public QObject {
@@ -58,7 +64,6 @@ public slots:
   void start(VideoStreamer::Format format, QString host, bool useJitterbuffer);
   void writeLog();
 signals:
-  void matReady(cvMatPtr image, int frameid);
   void ready(VideoStreamer::Format format, quint16 port);
 
 public:

@@ -36,7 +36,7 @@ void ImageWriter::writeImage(qint32 session, NetworkConnection::File file)
 }
 
 
-void ImageWriter::writeMat(qint32 session, cvMatPtr image, int frameid)
+void ImageWriter::writeMat(qint32 session, quint32 frameid, cvMatPtr image)
 {
   if (!mEnabled) {
     return;

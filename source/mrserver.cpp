@@ -7,6 +7,7 @@
 
 #include "mrserver.h"
 #include "cannyfilter.h"
+#include "echoimage.h"
 #include "imagewriter.h"
 #include "mockclient.h"
 #include "networkconnection.h"
@@ -27,6 +28,7 @@
 #include <QJsonObject>
 #include <QFileInfo>
 #include <QDir>
+#include <QElapsedTimer>
 
 namespace MREdge {
 
@@ -65,7 +67,7 @@ public:
  * @param tcpPort TCP port to listen to.
  * @param udpPort UDP port to listen to.
  */
-MRServer::MRServer(quint16 tcpPort, quint16 udpPort, QString vocLoc, bool benchmarking)
+MRServer::MRServer()
 {
   // Set up the default OpenGL surface format.
   QSurfaceFormat format;
@@ -73,11 +75,94 @@ MRServer::MRServer(quint16 tcpPort, quint16 udpPort, QString vocLoc, bool benchm
   format.setSamples(8);
   QSurfaceFormat::setDefaultFormat(format);
   mFileWriter = nullptr;
-  mBenchmarking = benchmarking;
+  mBenchmarking = false;
   mDisplayResult = false;
   mReplaceVideoFeed = false;
+  mLogTime = false;
   mCvFramework = ORB_SLAM2;
+  mUptime = new QElapsedTimer();
+  mUptime->start();
+  mpVocabulary = nullptr;
 
+  qDebug() << " +------------------------------------";
+  qDebug() << " |               MREdge";
+  qDebug() << " |";
+  foreach (const auto &netInterface, QNetworkInterface::allInterfaces()) {
+    QNetworkInterface::InterfaceFlags flags = netInterface.flags();
+    if ((flags & QNetworkInterface::IsRunning) &&
+        !(flags & QNetworkInterface::IsLoopBack)) {
+      foreach (const auto &address, netInterface.addressEntries()) {
+        if (address.ip().protocol() == QAbstractSocket::IPv4Protocol) {
+          qDebug() << " |           IP:" << address.ip().toString().toLatin1().data();
+        }
+      }
+    }
+  }
+    qDebug() << " +------------------------------------";
+
+
+}
+
+/**
+ * @brief MRServer::~MRServer
+ */
+MRServer::~MRServer()
+{
+  qDeleteAll(sessions);
+  qDeleteAll(mMockClients);
+  if (mTcpCon) {
+    mTcpCon->deleteLater();
+  }
+  if (mUdpCon) {
+    mUdpCon->deleteLater();
+  }
+  if (mFileWriter) {
+    mFileWriter->deleteLater();
+  }
+#ifdef ENABLE_WIDGET_SUPPORT
+  qDeleteAll(mWindows);
+#endif
+  delete mpVocabulary;
+}
+
+/**
+ * @brief MRServer::loadVoc
+ * @param path
+ */
+void MRServer::loadVoc(QString path)
+{
+  fDebug << "Loading ORB-SLAM2's BoW vocabulary...";
+  mpVocabulary = new ORB_SLAM2::ORBVocabulary();
+  QFileInfo userVocabularyFile(path);
+  QFileInfo textVocabularyFile("ORBvoc.txt");
+  QFileInfo homeDirTextVocabularyFile(QDir::homePath() + QDir::separator() + "ORBvoc.txt");
+  if (userVocabularyFile.exists() && !path.isNull()) {
+    fDebug << "Loading text file from" << userVocabularyFile.absoluteFilePath();
+    mpVocabulary->loadFromTextFile(userVocabularyFile.absoluteFilePath().toStdString());
+  } else if (textVocabularyFile.exists()) {
+    fDebug << "Loading text file from" << textVocabularyFile.absoluteFilePath();
+    mpVocabulary->loadFromTextFile(textVocabularyFile.absoluteFilePath().toStdString());
+  } else if (homeDirTextVocabularyFile.exists()) {
+    fDebug << "Loading text file from" << homeDirTextVocabularyFile.absoluteFilePath();
+    mpVocabulary->loadFromTextFile(homeDirTextVocabularyFile.absoluteFilePath().toStdString());
+  }
+  if (mpVocabulary->empty()) {
+    fDebug << "Error: Could not load vocabulary.";
+    fDebug << "Place ORBvoc.txt in executable's directory.";
+    fDebug << "ORBvoc.txt can be found in /externals/ORB_SLAM2/Vocabulary/ORBvoc.txt.tar.gz";
+  } else {
+    fDebug << "Vocabulary loaded.";
+  }
+}
+
+
+/**
+ * @brief MRServer::startServer
+ * @param tcpPort Port to listen for TCP connections on.
+ * @param udpPort Port to listen for UDP traffic on.
+ */
+void MRServer::startServer(quint16 tcpPort, quint16 udpPort)
+{
   mTcpCon = new TcpConnection(this, tcpPort);
   mUdpCon = new UdpConnection(this, udpPort);
   QObject::connect(this, &MRServer::sendFile,
@@ -94,51 +179,10 @@ MRServer::MRServer(quint16 tcpPort, quint16 udpPort, QString vocLoc, bool benchm
                    this, &MRServer::removeSession);
 
   qDebug() << " +------------------------------------";
-  qDebug() << " |               MREdge";
-  if (mBenchmarking) {
-    qDebug() << " |     Benchmarking mode enabled.";
-  }
-  qDebug() << " | ";
-  foreach (const auto &netInterface, QNetworkInterface::allInterfaces()) {
-    QNetworkInterface::InterfaceFlags flags = netInterface.flags();
-    if ((flags & QNetworkInterface::IsRunning) &&
-        !(flags & QNetworkInterface::IsLoopBack)) {
-      foreach (const auto &address, netInterface.addressEntries()) {
-        if (address.ip().protocol() == QAbstractSocket::IPv4Protocol) {
-          qDebug() << " |      IP: " << address.ip().toString().toLatin1().data();
-        }
-      }
-    }
-  }
-  qDebug() << " |      Port (TCP): " << mTcpCon->getPort();
-  qDebug() << " |      Port (UDP): " << mUdpCon->getPort();
+  qDebug() << " |           Port (TCP):" << mTcpCon->getPort();
+  qDebug() << " |           Port (UDP):" << mUdpCon->getPort();
   qDebug() << " +------------------------------------";
 
-  mpVocabulary = nullptr;
-
-  fDebug << "Loading ORB-SLAM2's BoW vocabulary...";
-
-  mpVocabulary = new ORB_SLAM2::ORBVocabulary();
-  QFileInfo userVocabularyFile(vocLoc);
-  QFileInfo textVocabularyFile("ORBvoc.txt");
-  QFileInfo homeDirTextVocabularyFile(QDir::homePath() + QDir::separator() + "ORBvoc.txt");
-  if (userVocabularyFile.exists() && !vocLoc.isNull()) {
-    fDebug << "Loading text file from " << userVocabularyFile.absoluteFilePath();
-    mpVocabulary->loadFromTextFile(userVocabularyFile.absoluteFilePath().toStdString());
-  } else if (textVocabularyFile.exists()) {
-    fDebug << "Loading text file from " << textVocabularyFile.absoluteFilePath();
-    mpVocabulary->loadFromTextFile(textVocabularyFile.absoluteFilePath().toStdString());
-  } else if (homeDirTextVocabularyFile.exists()) {
-    fDebug << "Loading text file from " << homeDirTextVocabularyFile.absoluteFilePath();
-    mpVocabulary->loadFromTextFile(homeDirTextVocabularyFile.absoluteFilePath().toStdString());
-  }
-  if (mpVocabulary->empty()) {
-    fDebug << "Error: Could not load vocabulary.";
-    fDebug << "Place ORBvoc.txt in executable's directory.";
-    fDebug << "ORBvoc.txt can be found in /externals/ORB_SLAM2/Vocabulary/ORBvoc.txt.tar.gz";
-  } else {
-    fDebug << "Vocabulary loaded.";
-  }
   if (mTcpCon->getPort()) {
     fDebug << "Waiting for clients to connect.";
   }
@@ -197,8 +241,9 @@ void MRServer::displayImage(qint32 session, QImage image)
  * @param image Image to be displayed.
  * Wrapper for displayImage(qint32 session, QImage image)
  */
-void MRServer::displayImagePtr(qint32 session, QImagePtr image) {
+void MRServer::displayImagePtr(qint32 session, quint32 frameid, QImagePtr image) {
   Q_UNUSED(image);
+  Q_UNUSED(frameid);
   Q_UNUSED(session);
 #ifdef ENABLE_WIDGET_SUPPORT
   displayImage(session, *image);
@@ -259,23 +304,14 @@ void MRServer::forceVideoInputFromCamera(QString path)
   }
 }
 
-/**
- * @brief MRServer::~MRServer
- */
-MRServer::~MRServer()
+void MRServer::setBenchmarkingMode(bool enable)
 {
-  qDeleteAll(sessions);
-  qDeleteAll(mMockClients);
-  mTcpCon->deleteLater();
-  mUdpCon->deleteLater();
-  if (mFileWriter) {
-    mFileWriter->deleteLater();
+  if (mBenchmarking) {
+    fDebug << "Benchmarking mode enabled.";
   }
-#ifdef ENABLE_WIDGET_SUPPORT
-  qDeleteAll(mWindows);
-#endif
-  delete mpVocabulary;
+  mBenchmarking = enable;
 }
+
 
 /**
  * @brief MRServer::dataReceived
@@ -287,8 +323,8 @@ MRServer::~MRServer()
  */
 void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
 {
-  fDebug << QString("Data received: (session=%1, type=%2, length=%3)")
-            .arg(sessionId).arg(file.type).arg(file.data.isNull() ? 0 : file.data->length());
+  fDebug << sessionId << QString("Data received: (type=%1, length=%2)")
+            .arg(file.type).arg(file.data.isNull() ? 0 : file.data->length());
   mSessionsListmutex.lock();
   Session *session = sessions.value(sessionId);
   mSessionsListmutex.unlock();
@@ -298,18 +334,18 @@ void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
   }
   switch (file.type) {
   case NetworkConnection::FileType::JSON: {
-    fDebug << sessionId << ": JSON: " << file.data->constData();
+    fDebug << sessionId << ": JSON:" << file.data->constData();
     auto jsonObject = QJsonDocument::fromJson(file.data->constData()).object();
     if (jsonObject.contains("TransportProtocol")) {
       bool useTcp = (jsonObject["TransportProtocol"].toString() == "TCP");
       bool useUdp = (jsonObject["TransportProtocol"].toString() == "UDP");
-      fDebug << sessionId << ": TransportProtocol: " << jsonObject["TransportProtocol"].toString();
+      fDebug << sessionId << ": TransportProtocol:" << jsonObject["TransportProtocol"].toString();
       mTcpCon->setSendImagesForSession(sessionId, useTcp);
       mUdpCon->setSendImagesForSession(sessionId, useUdp);
     }
     if (jsonObject.contains("JpegStream")) {
       bool sendmjpeg = jsonObject["JpegStream"].toBool();
-      fDebug << sessionId << ": JpegStream: " << sendmjpeg;
+      fDebug << sessionId << ": JpegStream:" << sendmjpeg;
       if (session->imageprocesser) {
         session->imageprocesser->setEmitJPEG(sendmjpeg);
         session->imageprocesser->setEmitQImage(!sendmjpeg);
@@ -317,7 +353,7 @@ void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
     }
     if (jsonObject.contains("VideoBitrate")) {
       int bitrate = jsonObject["VideoBitrate"].toInt();
-      fDebug << sessionId << ": VideoBitrate: " << bitrate;
+      fDebug << sessionId << ": VideoBitrate:" << bitrate;
       if (session->videotransmitter) {
         session->videotransmitter->setBitrate(bitrate);
       }
@@ -330,21 +366,21 @@ void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
     }
     if (jsonObject.contains("DebugMode")) {
       bool debugmode = jsonObject["DebugMode"].toBool();
-      fDebug << sessionId << ": DebugMode: " << debugmode;
+      fDebug << sessionId << ": DebugMode:" << debugmode;
       if (session->imageprocesser) {
         session->imageprocesser->setDebugMode(debugmode);
       }
     }
     if (jsonObject.contains("PacketSize")) {
       qint32 packetSize = jsonObject["PacketSize"].toInt();
-      fDebug << sessionId << ": PacketSize: " << packetSize;
+      fDebug << sessionId << ": PacketSize:" << packetSize;
       mUdpCon->setPacketSize(sessionId, packetSize);
     }
     if (jsonObject.contains("VideoReceiverPort") && jsonObject.contains("VideoReceiverFormat")) {
       auto destPort = static_cast<quint16>(jsonObject["VideoReceiverPort"].toInt());
       auto destFormatStr = jsonObject["VideoReceiverFormat"].toString();
-      fDebug << sessionId << ": VideoReceiverPort: " << destPort;
-      fDebug << sessionId << ": VideoReceiverFormat: " << destFormatStr;
+      fDebug << sessionId << ": VideoReceiverPort:" << destPort;
+      fDebug << sessionId << ": VideoReceiverFormat:" << destFormatStr;
       VideoStreamer::Format format = VideoStreamer::Format::H264_UDP;
       if (destFormatStr == "H264_UDP") {
         format = VideoStreamer::Format::H264_UDP;
@@ -360,7 +396,7 @@ void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
     if (jsonObject.contains("VideoTransmitterFormat")) {
       auto format = VideoStreamer::Format::H264_UDP;
       auto srcFormatStr = jsonObject["VideoTransmitterFormat"].toString();
-      fDebug << sessionId << ": VideoTransmitterFormat: " << srcFormatStr;
+      fDebug << sessionId << ": VideoTransmitterFormat:" << srcFormatStr;
       if (srcFormatStr == "H264_UDP") {
         format = VideoStreamer::Format::H264_UDP;
       } else if (srcFormatStr == "H264_TCP") {
@@ -369,7 +405,7 @@ void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
       bool useJitterbuffer = false;
       if (jsonObject.contains("VideoTransmitterUseJitterBuffer")) {
         useJitterbuffer = jsonObject.value("VideoTransmitterUseJitterBuffer").toBool();
-        fDebug << sessionId << ": VideoTransmitterUseJitterBuffer: " << useJitterbuffer;
+        fDebug << sessionId << ": VideoTransmitterUseJitterBuffer:" << useJitterbuffer;
       }
       if (session->videoreceiver) {
         session->videoreceiver->start(format, useJitterbuffer);
@@ -379,31 +415,31 @@ void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
         jsonObject.contains("Camera.height")) {
       int width = jsonObject["Camera.width"].toInt();
       int height = jsonObject["Camera.height"].toInt();
-      fDebug << sessionId << ": Camera.width: " << width;
-      fDebug << sessionId << ": Camera.height: " << height;
+      fDebug << sessionId << ": Camera.width:" << width;
+      fDebug << sessionId << ": Camera.height:" << height;
       if (jsonObject.contains("Camera.fx")) {
-        fDebug << sessionId << ": Camera.fx: " << jsonObject["Camera.fx"].toDouble();
+        fDebug << sessionId << ": Camera.fx:" << jsonObject["Camera.fx"].toDouble();
       }
       if (jsonObject.contains("Camera.fy")) {
-        fDebug << sessionId << ": Camera.fy: " << jsonObject["Camera.fy"].toDouble();
+        fDebug << sessionId << ": Camera.fy:" << jsonObject["Camera.fy"].toDouble();
       }
       if (jsonObject.contains("Camera.cx")) {
-        fDebug << sessionId << ": Camera.cx: " << jsonObject["Camera.cx"].toDouble();
+        fDebug << sessionId << ": Camera.cx:" << jsonObject["Camera.cx"].toDouble();
       }
       if (jsonObject.contains("Camera.cy")) {
-        fDebug << sessionId << ": Camera.cy: " << jsonObject["Camera.cy"].toDouble();
+        fDebug << sessionId << ": Camera.cy:" << jsonObject["Camera.cy"].toDouble();
       }
       if (jsonObject.contains("Camera.k1")) {
-        fDebug << sessionId << ": Camera.k1: " << jsonObject["Camera.k1"].toDouble();
+        fDebug << sessionId << ": Camera.k1:" << jsonObject["Camera.k1"].toDouble();
       }
       if (jsonObject.contains("Camera.k2")) {
-        fDebug << sessionId << ": Camera.k2: " << jsonObject["Camera.k2"].toDouble();
+        fDebug << sessionId << ": Camera.k2:" << jsonObject["Camera.k2"].toDouble();
       }
       if (jsonObject.contains("Camera.p1")) {
-        fDebug << sessionId << ": Camera.p1: " << jsonObject["Camera.p1"].toDouble();
+        fDebug << sessionId << ": Camera.p1:" << jsonObject["Camera.p1"].toDouble();
       }
       if (jsonObject.contains("Camera.p2")) {
-        fDebug << sessionId << ": Camera.p2: " << jsonObject["Camera.p2"].toDouble();
+        fDebug << sessionId << ": Camera.p2:" << jsonObject["Camera.p2"].toDouble();
       }
       if (session->imageprocesser) {
         session->imageprocesser->setConfig(jsonObject);
@@ -433,7 +469,7 @@ void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
   case NetworkConnection::FileType::CALIBRATION: {
     auto calibrationMode = (file.data.data()->length() == 1 &&
                             file.data.data()->data()[0] != 0);
-    fDebug << sessionId << ": Calibration mode: " << calibrationMode;
+    fDebug << sessionId << ": Calibration mode:" << calibrationMode;
     if (session->imageprocesser) {
       session->imageprocesser->setCalibrateMode(calibrationMode);
     }
@@ -462,14 +498,18 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
 
   mTcpCon->setSendImagesForSession(sessionId, true);
   mUdpCon->setSendImagesForSession(sessionId, false);
+  mTcpCon->setLogTime(mLogTime, mUptime);
+  mUdpCon->setLogTime(mLogTime, mUptime);
 
   auto videotransmitter = new VideoTransmitter(sessionId, host);
+  videotransmitter->setLogTime(mLogTime, mUptime);
   videotransmitter->setBenchmarkingMode(mBenchmarking);
   session->videotransmitter = videotransmitter;
   videotransmitter->moveToThread(new QThread(this));
   videotransmitter->thread()->start();
   if (!mReplaceVideoFeed) {
     auto videoreceiver = new VideoReceiver(sessionId, host);
+    videoreceiver->setLogTime(mLogTime, mUptime);
     videoreceiver->setBenchmarkingMode(mBenchmarking);
     session->videoreceiver = videoreceiver;
     videoreceiver->moveToThread(new QThread(this));
@@ -479,9 +519,14 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
   }
 
   ImageProcesser *imageprocesser;
-  if (mCvFramework == CANNYFILTER) {
+  switch (mCvFramework) {
+  case CANNYFILTER:
     imageprocesser = new CannyFilter(sessionId);
-  } else {
+    break;
+  case ECHOIMAGE:
+    imageprocesser = new EchoImage(sessionId);
+    break;
+  default:
     imageprocesser = new OrbSlamProcesser(sessionId, mpVocabulary, mBenchmarking);
   }
 
@@ -490,9 +535,11 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
   }
 
   session->imageprocesser = imageprocesser;
+  imageprocesser->setLogTime(mLogTime);
   imageprocesser->moveToThread(new QThread(this));
   imageprocesser->thread()->start();
   session->imageprocesser->setEmitMetadata(true);
+  auto videoreceiver = session->videoreceiver;
 
 #ifdef ENABLE_WIDGET_SUPPORT 
   if (mDisplayResult && !mWindows.contains(sessionId)) {
@@ -537,8 +584,6 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
       currCon = reinterpret_cast<NetworkConnection*>(mMockClients.at(i - 1));
     }
   }
-  // Video receiver
-  auto videoreceiver = session->videoreceiver;
   if (videoreceiver) {
     QObject::connect(videoreceiver, &NetworkConnection::matReady,
                      imageprocesser, &ImageProcesser::addMatToProcessQueue,
@@ -550,7 +595,7 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
                        mFileWriter, &ImageWriter::writeMat);
     }
   }
-  // Send data
+  // Send graphics output
   QObject::connect(imageprocesser, &ImageProcesser::sendQImage,
                    videotransmitter, &VideoTransmitter::addQImageToProcessQueue,
                    Qt::DirectConnection);
@@ -560,22 +605,36 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
     QObject::connect(imageprocesser, &ImageProcesser::sendFile,
                      mFileWriter, &ImageWriter::writeImage);
   }
+  // GUI window output
   if (mDisplayResult) {
     QObject::connect(imageprocesser, &ImageProcesser::sendQImage,
                      this, &MRServer::displayImagePtr);
     QObject::connect(videoreceiver, &VideoReceiver::matReady,
-                     [=](qint32 session, cvMatPtr image, int) {
+                     [=](qint32 session, quint32 frameid, cvMatPtr image) {
+      Q_UNUSED(frameid);
       this->displayImage(session + 1000, ImageProcesser::qImageFromMat(*image));
       });
   }
-
   QJsonObject retObject;
   retObject.insert("UdpPort", mUdpCon->getPort());
   retObject.insert("SessionId", sessionId);
   QByteArrayPtr ret(new QByteArray(QJsonDocument(retObject).toJson()));
-  fDebug << sessionId << ": Connection JSON: " << ret->data();
+  fDebug << sessionId << ": Connection JSON:" << ret->data();
   emit sendFile(sessionId, NetworkConnection::File(
                   NetworkConnection::FileType::JSON, 1, ret));
+}
+
+
+double median(std::vector<int> &v)
+{
+  size_t n = v.size() / 2;
+  std::nth_element(v.begin(), v.begin()+n, v.end());
+  int vn = v[n];
+  if (v.size() % 2 == 1) {
+    return vn;
+  }
+  std::nth_element(v.begin(), v.begin()+n-1, v.end());
+  return 0.5 * (vn + v[n-1]);
 }
 
 /**
@@ -585,9 +644,77 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
  */
 void MRServer::removeSession(qint32 sessionId)
 {
-  fDebug << "MRServer::removeSession: id: " << sessionId;
+  fDebug << "MRServer::removeSession: id:" << sessionId;
   mSessionsListmutex.lock();
   auto session = sessions.take(sessionId);
+  if (mLogTime) {
+    fDebug << "+========================================+";
+    fDebug << "|               STATISTICS               |";
+    fDebug << "+========================================+";
+    auto imagesprocessortimes = session->imageprocesser->getProcessingTimes();
+    auto mjpegsenttimes = mTcpCon->getProcessingTimes(sessionId);
+    auto videosenttimes = session->videotransmitter->getProcessingTimes();
+    auto videoarrivedtimes = session->videoreceiver->getProcessingTimes();
+    if (mjpegsenttimes.isEmpty()) {
+      mjpegsenttimes = mUdpCon->getProcessingTimes(sessionId);
+    }
+    int processedframes = 0;
+    quint64 totalprocessingtime = 0;
+    quint64 totalcvtime = 0;
+    QMapIterator<quint32, qint64> arrivedIt(videoarrivedtimes);
+    std::vector<int> processingMedianVector;
+    std::vector<int> mrMedianVector;
+    qint64 timeFirst = std::numeric_limits<qint64>::max();
+    qint64 timeLast = std::numeric_limits<qint64>::min();
+    while (arrivedIt.hasNext()) {
+      arrivedIt.next();
+      if (imagesprocessortimes.contains(arrivedIt.key())) {
+        processedframes++;
+        int processingtime = 0;
+        if (videosenttimes.contains(arrivedIt.key())) {
+          processingtime = (videosenttimes.value(arrivedIt.key()) - arrivedIt.value()) / 1000000;
+          timeFirst = (videosenttimes.value(arrivedIt.key()) < timeFirst) ?
+                videosenttimes.value(arrivedIt.key()) : timeFirst;
+          timeLast = (videosenttimes.value(arrivedIt.key()) > timeLast) ?
+                videosenttimes.value(arrivedIt.key()) : timeLast;
+        } else if (mjpegsenttimes.contains(arrivedIt.key())) {
+          processingtime = (mjpegsenttimes.value(arrivedIt.key()) - arrivedIt.value()) / 1000000;
+          timeFirst = (mjpegsenttimes.value(arrivedIt.key()) < timeFirst) ?
+                mjpegsenttimes.value(arrivedIt.key()) : timeFirst;
+          timeLast = (mjpegsenttimes.value(arrivedIt.key()) > timeLast) ?
+                mjpegsenttimes.value(arrivedIt.key()) : timeLast;
+        }
+        int mrtime = imagesprocessortimes.value(arrivedIt.key());
+        totalcvtime += mrtime;
+        totalprocessingtime += processingtime;
+        processingMedianVector.push_back(processingtime);
+        mrMedianVector.push_back(mrtime);
+        fDebug << QString("Frame: %1 - Processing time (ms): %2 - MR time (ms): %3")
+                  .arg(arrivedIt.key(), -4)
+                  .arg(processingtime, -4)
+                  .arg(mrtime, -4);
+      }
+    }
+    fDebug << "---------------------------------------";
+    fDebug << "Frames arrived:      " << videoarrivedtimes.size();
+    fDebug << "Frames processed:    " << imagesprocessortimes.size();
+    fDebug << "Frames sent as MJPEG:" << mjpegsenttimes.size();
+    fDebug << "Frames sent as H.264:" << videosenttimes.size();
+    if (processedframes > 0) {
+      fDebug << "Percentage skipped:   " << 100 *
+                (1 - (double)imagesprocessortimes.size() /
+                 (videoarrivedtimes.empty() ? 0 : videoarrivedtimes.size()));
+      fDebug << "Average Complete Time:" << (totalprocessingtime / processedframes);
+      fDebug << "Average MR time:      " << (totalcvtime / processedframes);
+      fDebug << "Median Complete time: " << median(processingMedianVector);
+      fDebug << "Median MR time:       " << median(mrMedianVector);
+      fDebug << "Total time:           " << ((timeLast - timeFirst) / 1000000) << "ms";
+      fDebug << "Average fps:          " <<
+                ((double) processedframes / ((timeLast - timeFirst) / 1000000000));
+    }
+    fDebug << "=======================================";
+
+  }
   mSessionsListmutex.unlock();
   delete session;
 }

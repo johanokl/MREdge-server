@@ -21,6 +21,7 @@
 #endif
 
 class QLabel;
+class QElapsedTimer;
 
 namespace MREdge {
 
@@ -44,11 +45,12 @@ class MRServer : public QObject {
 
 public:
   enum CV_FRAMEWORKS {
-      CANNYFILTER=0,
-      ORB_SLAM2=1
+    CANNYFILTER=0,
+    ORB_SLAM2=1,
+    ECHOIMAGE=2
   };
 
-  MRServer(quint16 tcpPort, quint16 udpPort, QString vocLoc, bool benchmarking);
+  MRServer();
   ~MRServer();
   void addMockClient(bool useWebcam, QString path="");
   void addFilewriter(QString path="");
@@ -61,12 +63,16 @@ signals:
 
 public slots:
   void dataReceived(qint32 session, NetworkConnection::File file);
-  void displayImagePtr(qint32 session, QImagePtr image);
+  void displayImagePtr(qint32 session, quint32 frameid, QImagePtr image);
   void displayImage(qint32 session, QImage image);
   void newSession(qint32 session, QString host, quint16 port);
-  void removeSession(qint32 sessionId);
-  void videoReceiverReady(qint32 sessionId, VideoStreamer::Format format, quint16 port);
+  void removeSession(qint32 session);
+  void videoReceiverReady(qint32 session, VideoStreamer::Format format, quint16 port);
   void setDisplayResults(bool enable) { mDisplayResult = enable; }
+  void setBenchmarkingMode(bool enable);
+  void setLogTime(bool enable) { mLogTime = enable; }
+  void startServer(quint16 tcpPort, quint16 udpPort);
+  void loadVoc(QString path);
   void setMixedRealityFramework(CV_FRAMEWORKS framework) {
     mCvFramework = framework; }
 
@@ -83,6 +89,8 @@ private:
   bool mDisplayResult;
   bool mBenchmarking;
   bool mReplaceVideoFeed;
+  bool mLogTime;
+  QElapsedTimer* mUptime;
 };
 
 /**

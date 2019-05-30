@@ -35,4 +35,25 @@ bool NetworkConnection::sendImagesForSession(qint32 sessionId)
   return retval;
 }
 
+/**
+ * @brief NetworkConnection::getProcessingTimes
+ * @return
+ */
+QMap<quint32, qint64> NetworkConnection::getProcessingTimes(qint32 session)
+{
+  mTimeLogsMutex.lock();
+  auto timelogs = mTimeLogs.value(session, nullptr);
+  mTimeLogsMutex.unlock();
+  QMap<quint32, qint64> retMap;
+  if (timelogs) {
+    retMap = *timelogs;
+    retMap.detach();
+  }
+  fDebug << "Retmap size:" << retMap.size();
+  retMap.remove(retMap.lastKey());
+  fDebug << "Retmap size:" << retMap.size();
+  return retMap;
+}
+
+
 }

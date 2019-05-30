@@ -68,7 +68,7 @@ void MockClient::startThread(unsigned long delay, unsigned long interval,
                      NetworkConnection::FileType::JSON, 1,
                      QByteArrayPtr(new QByteArray(QJsonDocument(retObject).toJson()))));
   }
-  int imagecounter = 0;
+  quint32 imagecounter = 0;
 
   if (webcam) {
     fDebug << "Using Webcam as source";
@@ -85,7 +85,7 @@ void MockClient::startThread(unsigned long delay, unsigned long interval,
       imagecounter++;
       cv::Mat frame;
       cap >> frame; // get a new frame from camera
-      emit matReady(getSession(), cvMatPtr(new cv::Mat(frame)), imagecounter);
+      emit matReady(getSession(), imagecounter, cvMatPtr(new cv::Mat(frame)));
       //if ((imagecounter % 500) == 100) {
       //  fDebug << "Trigger B";
       //  emit fileReady(getSession(), NetworkConnection::File(

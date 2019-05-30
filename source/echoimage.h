@@ -5,8 +5,8 @@
  * Johan Lindqvist (johan.lindqvist@gmail.com)
  */
 
-#ifndef CANNYFILTER_H
-#define CANNYFILTER_H
+#ifndef ECHOIMAGE_H
+#define ECHOIMAGE_H
 
 #include "global.h"
 #include "networkconnection.h"
@@ -19,17 +19,18 @@
 namespace MREdge {
 
 /**
- * @brief The CannyFilter class
+ * @brief The EchoImage class
  *
  * Example class that inherits ImageProcessor and runs OpenCV's
  * Canny Edge Detector on OpenCV Mat images and outputs the result
  * using sendImage() and sendFile() signals.
  */
-class CannyFilter : public ImageProcesser {
+class EchoImage : public ImageProcesser {
   Q_OBJECT
 
 public:
-  CannyFilter(qint32 session) { mSession = session; }
+  EchoImage(qint32 session);
+  virtual ~EchoImage() override;
   void setConfig(QJsonObject) override {}
   void setCalibrateMode(bool) override {}
   void calibrateCamera() override {}
@@ -44,4 +45,4 @@ private:
 
 }
 
-#endif // CANNYFILTER_H
+#endif // ECHOIMAGE_H

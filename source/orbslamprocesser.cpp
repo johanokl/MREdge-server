@@ -18,6 +18,7 @@
 #include "ViewerAR.h"
 #include <QDir>
 #include <QThread>
+#include <QElapsedTimer>
 
 namespace MREdge {
 
@@ -33,7 +34,6 @@ OrbSlamProcesser::OrbSlamProcesser(qint32 session, ORB_SLAM2::ORBVocabulary *voc
   mSLAM = nullptr;
   mViewerAR = nullptr;
   mCalibrateMode = false;
-  mImagesSent = 0;
   mBenchmarking = benchmarking;
   mRunning = true;
 }
@@ -146,17 +146,20 @@ void OrbSlamProcesser::setConfig(QJsonObject calibration)
     mViewerARthread = new std::thread(&ViewerAR::Run, mViewerAR);
 
     QObject::connect(mViewerAR, &ViewerAR::newImageReady,
-                     [=](QImagePtr img, int metadata) {
-      if (mRunning && mEmitJPEG) {
-        mImagesSent++;
-        emit sendFile(mSession, NetworkConnection::File(
-                        (mEmitMetadata ?
-                           NetworkConnection::FileType::IMAGE_WITH_METADATA :
-                           NetworkConnection::FileType::IMAGE),
-                        mImagesSent, jpegFromQImage(*img, mEmitMetadata, metadata)));
+                     [=](quint32 frameid, QImagePtr img, int metadata) {
+      if (mRunning && mLogTime) {
+        processingfinished.insert(frameid, mUptime->nsecsElapsed());
       }
-      if (mEmitQImage && mRunning) {
-        emit sendQImage(mSession, img);
+      if (mRunning && mEmitJPEG) {
+        emit sendFile(
+              mSession, NetworkConnection::File(
+                (mEmitMetadata ?
+                   NetworkConnection::FileType::IMAGE_WITH_METADATA :
+                   NetworkConnection::FileType::IMAGE),
+                frameid, jpegFromQImage(*img, mEmitMetadata, metadata)));
+      }
+      if (mRunning && mEmitQImage) {
+        emit sendQImage(mSession, frameid, img);
       }
     });
   }
@@ -174,6 +177,9 @@ void OrbSlamProcesser::setDebugMode(bool enable)
   mDebugMode = enable;
 }
 
+
+
+
 /**
  * @brief OrbSlamProcesser::process
  * @param session Session id
@@ -185,7 +191,7 @@ void OrbSlamProcesser::setDebugMode(bool enable)
  * If it's in normal mode, it's sent to the
  * ORB_SLAM2 SLAM system, to be rendered using the ViewerAR Mixed Reality class.
  */
-void OrbSlamProcesser::process(qint32 session, cvMatPtr mat, int frameid)
+void OrbSlamProcesser::process(qint32 session, quint32 frameid, cvMatPtr mat)
 {
   Q_UNUSED(session);
   if (mCalibrateMode) {
@@ -198,7 +204,7 @@ void OrbSlamProcesser::process(qint32 session, cvMatPtr mat, int frameid)
                       frameid, jpegFromMat(dstImage)));
     }
     if (mEmitQImage) {
-      emit sendQImage(mSession, QImagePtr(new QImage(qImageFromMat(outimg))));
+      emit sendQImage(mSession, frameid, QImagePtr(new QImage(qImageFromMat(outimg))));
     }
   } else if (mSLAM) {
     cv::Mat Tcw = mSLAM->TrackMonocular(*mat, frameid);
@@ -208,7 +214,7 @@ void OrbSlamProcesser::process(qint32 session, cvMatPtr mat, int frameid)
     //cv::Mat imu;
     //cv::undistort(*mat, imu, mK, mDistCoef);
     //cv::cvtColor(imu, imu, CV_RGB2BGR);
-    mViewerAR->setImagePose(*mat, Tcw, state, vKeys, vMPs);
+    mViewerAR->setImagePose(frameid, *mat, Tcw, state, vKeys, vMPs);
     if (mTriggeredA) {
       // Add a 3D object.
       mViewerAR->add3DObject();

@@ -23,7 +23,7 @@ typedef QSharedPointer<QImage> QImagePtr;
 
 
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
-#define fDebug qDebug() << __FILENAME__ << ":"
+#define fDebug qDebug().noquote() << __FILENAME__ << ":"
 
 }
 

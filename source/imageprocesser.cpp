@@ -11,10 +11,17 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 #include <QtCore/QBuffer>
+#include <QElapsedTimer>
 #include "imageprocesser.h"
 #include <mutex>
 
 namespace MREdge {
+
+ImageProcesser::ImageProcesser()
+{
+  mUptime = new QElapsedTimer;
+  mUptime->start();
+}
 
 /**
  * @brief ImageProcesser::matFromQImage
@@ -118,7 +125,7 @@ void ImageProcesser::addFileToProcessQueue(qint32 session, NetworkConnection::Fi
  *
  * Add a QImage to the process queue.
  */
-void ImageProcesser::addQImageToProcessQueue(qint32 session, QImage image, int frameid)
+void ImageProcesser::addQImageToProcessQueue(qint32 session, quint32 frameid, QImage image)
 {
   if (mAllowAllSources || session == mSession) {
     mProcessQueueMutex.lock();
@@ -136,7 +143,7 @@ void ImageProcesser::addQImageToProcessQueue(qint32 session, QImage image, int f
  *
  * Add an OpenCV Mat to the process queue.
  */
-void ImageProcesser::addMatToProcessQueue(qint32 session, cvMatPtr image, int frameid)
+void ImageProcesser::addMatToProcessQueue(qint32 session, quint32 frameid, cvMatPtr image)
 {
   if (mAllowAllSources || session == mSession) {
     mProcessQueueMutex.lock();
@@ -170,7 +177,7 @@ void ImageProcesser::processFile(qint32 session, NetworkConnection::File file)
     fDebug << "Image " << file.id << " is null";
     return;
   }
-  process(mSession, cvMatPtr(new cv::Mat(matFromQImage(QImage::fromData(*file.data, "JPEG")))), file.id);
+  process(mSession, file.id, cvMatPtr(new cv::Mat(matFromQImage(QImage::fromData(*file.data, "JPEG")))));
 }
 
 /**
@@ -181,7 +188,7 @@ void ImageProcesser::processFile(qint32 session, NetworkConnection::File file)
  *
  * Process the latest image in the QImage process queue.
  */
-void ImageProcesser::processQImage(qint32 session, QImage image, int frameid)
+void ImageProcesser::processQImage(qint32 session, quint32 frameid, QImage image)
 {
   if (!mAllowAllSources && session != mSession) {
     return;
@@ -197,7 +204,7 @@ void ImageProcesser::processQImage(qint32 session, QImage image, int frameid)
     fDebug << "Image " << frameid << " is null";
     return;
   }
-  process(mSession, cvMatPtr(new cv::Mat(matFromQImage(image))), frameid);
+  process(mSession, frameid, cvMatPtr(new cv::Mat(matFromQImage(image))));
 }
 
 /**
@@ -208,7 +215,7 @@ void ImageProcesser::processQImage(qint32 session, QImage image, int frameid)
  *
  * Process the latest image in the Mat process queue.
  */
-void ImageProcesser::processMat(qint32 session, cvMatPtr mat, int frameid)
+void ImageProcesser::processMat(qint32 session, quint32 frameid, cvMatPtr mat)
 {
   if (!mAllowAllSources && session != mSession) {
     return;
@@ -221,11 +228,41 @@ void ImageProcesser::processMat(qint32 session, cvMatPtr mat, int frameid)
     mProcessQueueMutex.unlock();
   }
   if (mat.isNull()) {
-    fDebug << "Image " << frameid << " is null";
+    mSkippedImages++;
     return;
   }
-  process(mSession, mat, frameid);
+  if (mSkippedImages > 0) {
+    fDebug << "Images arrived faster than could be processed. Skipped:"
+           << mSkippedImages;
+    mSkippedImages = 0;
+  }
+  if (mLogTime) {
+    processingstarted.insert(frameid, mUptime->nsecsElapsed());
+  }
+  process(mSession, frameid, mat);
 }
+
+
+/**
+ * @brief ImageProcesser::getProcessingTimes
+ * @return
+ */
+const QMap<quint32, qint32> ImageProcesser::getProcessingTimes()
+{
+  mRunning = false;
+  QMapIterator<quint32, qint64> processedIt(processingfinished);
+  QMap<quint32, qint32> retMap;
+  while (processedIt.hasNext()) {
+    processedIt.next();
+    if (processingstarted.contains(processedIt.key())) {
+      retMap.insert(processedIt.key(),
+                    ((processedIt.value() - processingstarted.value(processedIt.key()))
+                     / 1000000));
+    }
+  }
+  return retMap;
+}
+
 
 /**
  * @brief ImageProcesser::triggerActionA

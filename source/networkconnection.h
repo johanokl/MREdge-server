@@ -13,6 +13,8 @@
 #include <QMutex>
 #include <QJsonObject>
 
+class QElapsedTimer;
+
 namespace MREdge {
 
 class NetworkConnection : public QObject {
@@ -36,22 +38,24 @@ public:
 
   class File {
   public:
-    File(qint16 _type = 0, qint32 _id = 0,
+    File(qint16 _type = 0, quint32 _id = 0,
          QByteArrayPtr _data = nullptr, qint32 _metadata = 0)
       : id(_id), type(_type), data(_data), metadata(_metadata) {}
     ~File() {}
     File(const File &rhs) :
       id(rhs.id), type(rhs.type),
       data(rhs.data), metadata(rhs.metadata) {}
-    qint32 id;
+    quint32 id;
     qint16 type;
     QByteArrayPtr data;
     qint32 metadata;
   };
 
+  virtual QMap<quint32, qint64> getProcessingTimes(qint32 session);
+
 signals:
   void fileReady(qint32 session, File file);
-  void matReady(qint32 session, cvMatPtr image, int frameid);
+  void matReady(qint32 session, quint32 frameid, cvMatPtr image);
   void newSession(qint32 session, QString host, quint16 port);
   void sessionDestroyed(qint32);
 
@@ -60,6 +64,8 @@ public slots:
   virtual void sendFile(qint32 /*session*/, File /*file*/) {}
   virtual void setSendImagesForSession(qint32 sessionId, bool enabled);
   virtual bool sendImagesForSession(qint32 sessionId);
+  virtual void setLogTime(bool enable, QElapsedTimer* timer=nullptr) {
+    mLogTime = enable; mUptime=timer; }
 
 protected:
   virtual void bytesWritten(qint32, qint64) {}
@@ -69,6 +75,11 @@ protected:
   QMap<qint32, bool> mSendImagesForSessionList;
   QMutex mSendBufferFilesMutex;
   QMutex mSendImagesForSessionListMutex;
+
+  bool mLogTime = false;
+  QElapsedTimer* mUptime;
+  QMutex mTimeLogsMutex;
+  QMap<qint32, QMap<quint32, qint64>*> mTimeLogs;
 };
 
 }

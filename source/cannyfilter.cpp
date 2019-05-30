@@ -43,10 +43,9 @@ double CannyFilter::medianMat(cv::Mat mat)
  *
  * Run Canny edge detector on the received image.
  */
-void CannyFilter::process(qint32 session, cvMatPtr image, int frameid)
+void CannyFilter::process(qint32 session, quint32 frameid, cvMatPtr image)
 {
   fDebug << "CannyFilter::process";
-  Q_UNUSED(frameid);
   Q_UNUSED(session);
   cv::Mat dst;
   dst.create(image->size(), image->type());
@@ -65,11 +64,12 @@ void CannyFilter::process(qint32 session, cvMatPtr image, int frameid)
   if (mEmitJPEG) {
     fDebug << "Emitting JPEG";
     emit sendFile(mSession, NetworkConnection::File(
-                    NetworkConnection::FileType::IMAGE, 1, jpegFromMat(dst)));
+                    NetworkConnection::FileType::IMAGE, frameid, jpegFromMat(dst)));
   }
   if (mEmitQImage) {
     fDebug << "Emitting QImage";
-    emit sendQImage(mSession, QImagePtr(new QImage(qImageFromMat(dst))));
+    emit sendQImage(mSession, frameid,
+                    QImagePtr(new QImage(qImageFromMat(dst))));
   }
 }
 

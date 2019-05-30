@@ -24,7 +24,7 @@ public:
 
 public slots:
   void writeImage(qint32 session, NetworkConnection::File file);
-  void writeMat(qint32 session, cvMatPtr image, int frameid);
+  void writeMat(qint32 session, quint32 frameid, cvMatPtr image);
   void setEnabled(bool enabled) {
     mEnabled = enabled;
   }

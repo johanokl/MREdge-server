@@ -14,6 +14,7 @@
 #include <QTcpSocket>
 #include <QThread>
 #include <QDateTime>
+#include <QElapsedTimer>
 
 namespace MREdge {
 
@@ -74,9 +75,8 @@ void TcpConnection::sendFileIfLatest(qint32 session, File file)
     fDebug << "New file replaces old file in buffer.";
   }
   mSendBufferFiles.insert(session, file);
-  fDebug << "Inserted";
   mSendBufferFilesMutex.unlock();
-  bytesWritten(session, 0);
+  bytesWritten(session, 0); // Check if can send.
 }
 
 /**
@@ -95,10 +95,13 @@ void TcpConnection::sendFile(qint32 session, File file)
       !sendImagesForSession(session)) {
     return;
   }
-  fDebug << QString("sendFile: type=%1, length=%2")
-            .arg(file.type).arg(file.data->size());
+  if (file.type != NetworkConnection::FileType::IMAGE &&
+       file.type != NetworkConnection::FileType::IMAGE_WITH_METADATA) {
+    fDebug << QString("Sending (session=%1, type=%2, length=%3)")
+              .arg(session).arg(file.type).arg(file.data->length());
+  }
   mSessionMutex.lock();
-  QTcpSocket *sendsock = mSockets.value(session, nullptr);
+  auto sendsock = mSockets.value(session, nullptr);
   mSessionMutex.unlock();
   if (sendsock == nullptr || !sendsock->isOpen()) {
     fDebug << "No valid open socket";
@@ -120,6 +123,16 @@ void TcpConnection::sendFile(qint32 session, File file)
   level += sendsock->write(*file.data);
   mSendBufferLevels.insert(session, level);
   mSendBufferLevelsMutex.unlock();
+  if (mLogTime && mUptime &&
+      (file.type == NetworkConnection::FileType::IMAGE ||
+      file.type == NetworkConnection::FileType::IMAGE_WITH_METADATA)) {
+    mTimeLogsMutex.lock();
+    auto timelogs = mTimeLogs.value(session, nullptr);
+    mTimeLogsMutex.unlock();
+    if (timelogs) {
+      timelogs->insert(file.id, mUptime->nsecsElapsed());
+    }
+  }
 }
 
 /**
@@ -132,7 +145,7 @@ void TcpConnection::sendFile(qint32 session, File file)
 void TcpConnection::newConnection()
 {
   while (mServer->hasPendingConnections()) {
-    QTcpSocket *client = mServer->nextPendingConnection();
+    auto client = mServer->nextPendingConnection();
     QString clientHost = client->peerAddress().toString();
     quint16 clientPort = client->peerPort();
     fDebug << QString("New connection: Sender ip: %1, sender port %2")
@@ -153,6 +166,9 @@ void TcpConnection::newConnection()
     }
     mSockets.insert(sessionId, client);
     mSessionMutex.unlock();
+    mTimeLogsMutex.lock();
+    mTimeLogs.insert(sessionId, new QMap<quint32, qint64>());
+    mTimeLogsMutex.unlock();
     auto tcpbuilder = new TcpBuilder(sessionId);
     mTcpBuilders.insert(sessionId, tcpbuilder);
     // Announce that a new session has been set up so that other

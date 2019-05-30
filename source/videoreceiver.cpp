@@ -33,6 +33,7 @@ public:
     parent = _parent;
     reachedEndOfStream = false;
     running = false;
+    frames_sent = 0;
   }
   // Share frame between main loop and gstreamer callback
   cvMatPtr latestFrame;
@@ -42,6 +43,7 @@ public:
   QMap<int, int> frames_processed_per_time_slice;
   GMainLoop *mainLoop;
   GStreamerReceiver *parent;
+  quint32 frames_sent;
 };
 
 /**
@@ -79,25 +81,27 @@ VideoReceiver::VideoReceiver(qint32 session, QString senderHost)
 }
 
 /**
+ * @brief VideoTransmitter::getProcessingTimes
+ * @return
+ */
+QMap<quint32, qint64> VideoReceiver::getProcessingTimes() const
+{
+  auto retMap = mFramesArrivedNsec;
+  retMap.detach();
+  return retMap;
+}
+
+/**
  * @brief VideoReceiver::newMat
  * @param image
  * @param frameid
  */
-void VideoReceiver::newMat(cvMatPtr image)
+void VideoReceiver::newMat(quint32 frameid, cvMatPtr image)
 {
-  fDebug << "Mat received: " << mFramesSent;
-  mFramesSent++;
-  emit matReady(mSession, image, mFramesSent);
-}
-
-/**
- * @brief VideoReceiver::statisticsUpdated
- * @param statJson
- */
-void VideoReceiver::statisticsUpdated(QJsonObject statJson)
-{
-  statJson.insert("FramesReceived", mFramesSent);
-  emit statistics(mSession, statJson);
+  if (mLogTime && mUptime) {
+    mFramesArrivedNsec.insert(frameid, mUptime->nsecsElapsed());
+  }
+  emit matReady(mSession, frameid, image);
 }
 
 /**
@@ -178,12 +182,13 @@ GstFlowReturn frame_received_callback(GstAppSink *appsink, gpointer data)
   auto currFrame = cvMatPtr(new cv::Mat(cv::Size(width, height), CV_8UC3,
                                         reinterpret_cast<char *>(imgbuf),
                                         cv::Mat::AUTO_STEP));
-  fDebug << QString("Received image with size %1x%2")
-            .arg(currFrame->size().width).arg(currFrame->size().height);
-
+  ctx->frames_sent++;
+  //fDebug << QString("Received image: id: %1 (size %2x%3)")
+  //          .arg(ctx->frames_sent)
+  //          .arg(currFrame->size().width).arg(currFrame->size().height);
   auto time_slice = ctx->timer.elapsed() / 1000;
   ctx->frames_processed_per_time_slice[time_slice] += 1;
-  ctx->parent->parent()->newMat(currFrame);
+  ctx->parent->parent()->newMat(ctx->frames_sent, currFrame);
   gst_buffer_unmap(buffer, &map);
   gst_sample_unref(sample);
   return GST_FLOW_OK;
@@ -396,11 +401,13 @@ void GStreamerReceiver::start(VideoStreamer::Format format, QString destHost, bo
   if (format == VideoStreamer::Format::H264_TCP) {
     foreach (const auto &netInterface, QNetworkInterface::allInterfaces()) {
       QNetworkInterface::InterfaceFlags flags = netInterface.flags();
-      if ((flags & QNetworkInterface::IsRunning) &&
+      if (thisHost.isEmpty() &&
+          (flags & QNetworkInterface::IsRunning) &&
           !(flags & QNetworkInterface::IsLoopBack)) {
         foreach (const auto &address, netInterface.addressEntries()) {
           if (address.ip().protocol() == QAbstractSocket::IPv4Protocol) {
             thisHost = address.ip().toString().toLatin1().data();
+            break;
           }
         }
       }
@@ -475,6 +482,8 @@ void GStreamerReceiver::start(VideoStreamer::Format format, QString destHost, bo
   }
   gst_element_set_state(pipeline, GST_STATE_PLAYING);
   emit ready(format, static_cast<quint16>(port));
+
+  fDebug << "Port: " << port;
 
   mCtx->timer.start();
 

@@ -38,17 +38,19 @@ public:
   UdpConnection(MRServer *parent, quint16 port);
   ~UdpConnection() override;
   quint16 getPort() override { return mPort; }
+  QMap<quint32, qint64> getProcessingTimes(qint32 session) override;
 
 signals:
+  void dataAvailable(QString, quint16, QByteArrayPtr);
   void fileToSendUdp(qint32 session, QString host, quint16 port,
                      qint32 packetsize, File file);
-  void dataAvailable(QString, quint16, QByteArrayPtr);
 
 public slots:
   void readyRead();
+  void setPacketSize(qint32 session, qint32 packetsize);
   void sendFile(qint32 session, File file) override;
   void sendFileIfLatest(qint32 session, File file) override;
-  void setPacketSize(qint32 session, qint32 packetsize);
+  void setLogTime(bool enable, QElapsedTimer* timer) override;
 
 private:
   QUdpSocket *mRecvsock;

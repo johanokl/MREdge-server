@@ -105,7 +105,8 @@ SOURCES += \
     source/networkconnection.cpp \
     source/videoreceiver.cpp \
     source/videotransmitter.cpp \
-    source/orbslamprocesser.cpp
+    source/orbslamprocesser.cpp \
+    source/echoimage.cpp
 
 
 HEADERS += \
@@ -124,7 +125,8 @@ HEADERS += \
     source/udpsender.h \
     source/videoreceiver.h \
     source/videotransmitter.h \
-    source/orbslamprocesser.h
+    source/orbslamprocesser.h \
+    source/echoimage.h
 
 
 SOURCES += \

@@ -83,7 +83,7 @@ public:
   }
 
   void setImagePose(
-      quint32 frameid, const cv::Mat &im, const cv::Mat &Tcw, const int &status,
+      quint32 frameid, bool forcecolor, const cv::Mat &im, const cv::Mat &Tcw, const int &status,
       const std::vector<cv::KeyPoint> &vKeys, const std::vector<ORB_SLAM2::MapPoint*> &vMPs);
 
   void getImagePose(
@@ -145,7 +145,7 @@ private:
   bool mRemove3dObject = false;
   int mWidth;
   int mHeight;
-
+  bool mForceColor;
   QString m3DObjectType;
   bool mBenchmarking;
 };

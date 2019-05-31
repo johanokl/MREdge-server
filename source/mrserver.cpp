@@ -536,6 +536,7 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
 
   session->imageprocesser = imageprocesser;
   imageprocesser->setLogTime(mLogTime);
+  imageprocesser->setIdentifyColorFrame(mIdentifyColorFrame);
   imageprocesser->moveToThread(new QThread(this));
   imageprocesser->thread()->start();
   session->imageprocesser->setEmitMetadata(true);

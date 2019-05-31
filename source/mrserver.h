@@ -71,6 +71,7 @@ public slots:
   void setDisplayResults(bool enable) { mDisplayResult = enable; }
   void setBenchmarkingMode(bool enable);
   void setLogTime(bool enable) { mLogTime = enable; }
+  void setIdentifyColorFrame(bool enable) { mIdentifyColorFrame = enable; }
   void startServer(quint16 tcpPort, quint16 udpPort);
   void loadVoc(QString path);
   void setMixedRealityFramework(CV_FRAMEWORKS framework) {
@@ -91,6 +92,7 @@ private:
   bool mReplaceVideoFeed;
   bool mLogTime;
   QElapsedTimer* mUptime;
+  bool mIdentifyColorFrame;
 };
 
 /**

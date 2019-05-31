@@ -248,6 +248,26 @@ void ViewerAR::Run()
         }
       }
     }
+    if (mForceColor) {
+      arData = 2;
+      glDisable(GL_DEPTH_TEST);
+      glMatrixMode(GL_MODELVIEW);
+      glLoadIdentity();
+      glMatrixMode(GL_PROJECTION);
+      glLoadIdentity();
+      gluOrtho2D(-1000, 1000, -1000, 1000);
+      glLoadIdentity();
+      glBegin(GL_POLYGON);
+      glColor3f(1, 0, 1);
+      glVertex2f(-1000, -1000);
+      glVertex2f(1000, -1000);
+      glVertex2f(1000, 1000);
+      glVertex2f(-1000, 1000);
+      glEnd();
+      glEnable(GL_DEPTH_TEST);
+      glMatrixMode(GL_MODELVIEW);
+      glLoadIdentity();
+    }
 
 #ifdef DISABLE_IMAGE_OUTPUT
     QImagePtr outImage(new QImage());
@@ -307,12 +327,14 @@ void ViewerAR::Run()
  * @param vMPs
  */
 void ViewerAR::setImagePose(
-    quint32 id, const cv::Mat &im, const cv::Mat &Tcw, const int &status,
+    quint32 id, bool forcecolor,
+    const cv::Mat &im, const cv::Mat &Tcw, const int &status,
     const vector<cv::KeyPoint> &vKeys, const vector<ORB_SLAM2::MapPoint*> &vMPs)
 {
   mMutexPoseImage.lock();
   mPoseReady = true;
   mFrameId = id;
+  mForceColor = forcecolor;
   mImage = im.clone();
   mTcw = Tcw.clone();
   mStatus = status;

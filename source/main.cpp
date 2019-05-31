@@ -109,8 +109,13 @@ int main(int argc, char *argv[])
 
   QCommandLineOption benchmarkingOption(
         QStringList() << "b" << "benchmarking",
-        "Fill the screen with solid colors when point cloud or AR objects are visible.");
+        "Fill the screen with a solid color when point cloud or MR objects are visible.");
   parser.addOption(benchmarkingOption);
+
+  QCommandLineOption identifyColorFrameOption(
+        QStringList() << "i" << "identifycolor",
+        "Look for pictures filled with the data color #F0F and act on it. Used for benchmarking.");
+  parser.addOption(identifyColorFrameOption);
 
   QCommandLineOption replaceVideoInOption(
         QStringList() << "r" << "replaceinput",
@@ -140,6 +145,7 @@ int main(int argc, char *argv[])
   bool benchmarkingOptionEnabled = parser.isSet(benchmarkingOption);
   bool displayOptionEnabled = parser.isSet(displayOption);
   bool logTimeOptionEnabled = parser.isSet(logTimeOption);
+  bool identifyColorFrameOptionEnabled = parser.isSet(identifyColorFrameOption);
 
 #ifndef ENABLE_WIDGET_SUPPORT
   if (displayOptionEnabled) {
@@ -153,6 +159,7 @@ int main(int argc, char *argv[])
   myServer.setBenchmarkingMode(benchmarkingOptionEnabled);
   myServer.setLogTime(logTimeOptionEnabled);
   myServer.setDisplayResults(displayOptionEnabled);
+  myServer.setIdentifyColorFrame(identifyColorFrameOptionEnabled);
 
   if (parser.isSet(cannyFilterOption)) {
     fDebug << "Using CANNY FILTER";

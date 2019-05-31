@@ -207,14 +207,25 @@ void OrbSlamProcesser::process(qint32 session, quint32 frameid, cvMatPtr mat)
       emit sendQImage(mSession, frameid, QImagePtr(new QImage(qImageFromMat(outimg))));
     }
   } else if (mSLAM) {
+    bool colorFrame = false;
+    if (mIdentifyColorFrame) {
+      colorFrame = true;
+      for (int i = 0; i < 10; i++) {
+        unsigned char * p = mat->ptr(20 * i,  20 * i);
+        if (p[0] != 252 || p[1] != 0 || p[2] != 252) {
+           colorFrame = false;
+           break;
+        }
+      }
+      if (colorFrame) {
+        fDebug << "Color frame found";
+      }
+    }
     cv::Mat Tcw = mSLAM->TrackMonocular(*mat, frameid);
     int state = mSLAM->GetTrackingState();
     vector<ORB_SLAM2::MapPoint*> vMPs = mSLAM->GetTrackedMapPoints();
     vector<cv::KeyPoint> vKeys = mSLAM->GetTrackedKeyPointsUn();
-    //cv::Mat imu;
-    //cv::undistort(*mat, imu, mK, mDistCoef);
-    //cv::cvtColor(imu, imu, CV_RGB2BGR);
-    mViewerAR->setImagePose(frameid, *mat, Tcw, state, vKeys, vMPs);
+    mViewerAR->setImagePose(frameid, colorFrame, *mat, Tcw, state, vKeys, vMPs);
     if (mTriggeredA) {
       // Add a 3D object.
       mViewerAR->add3DObject();

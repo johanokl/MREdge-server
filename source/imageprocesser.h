@@ -43,6 +43,7 @@ public slots:
   void setEmitJPEG(bool enable) { mEmitJPEG = enable; }
   void setEmitMetadata(bool enable) { mEmitMetadata = enable; }
   void setEmitQImage(bool enable) { mEmitQImage = enable; }
+  void setIdentifyColorFrame(bool enable) { mIdentifyColorFrame = enable; }
   virtual void setDebugMode(bool enable) { mDebugMode = enable; }
   void setAllowAllSources(bool allow) { mAllowAllSources = allow; }
   void setLogTime(bool enable) { mLogTime = enable; }
@@ -79,6 +80,7 @@ protected:
   bool mTriggeredC = false;
   bool mDebugMode = false;
   bool mAllowAllSources = false;
+  bool mIdentifyColorFrame = false;
   int mSkippedImages = 0;
   bool mLogTime = false;
   QMap<quint32, qint64> processingstarted;

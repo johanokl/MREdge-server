@@ -29,9 +29,10 @@
 namespace ORB_SLAM2
 {
 
-System::System(ORBVocabulary *voc, const QJsonObject settingsFile, const eSensor sensor, const bool bUseViewer)
+System::System(ORBVocabulary *voc, const QJsonObject settingsFile, const eSensor sensor,
+               const bool bUseViewer, const bool bLoopClosing)
     : mSensor(sensor), mpVocabulary(voc), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false),mbActivateLocalizationMode(false),
-        mbDeactivateLocalizationMode(false)
+        mbDeactivateLocalizationMode(false), mLoopClosing(bLoopClosing)
 {
     // Output welcome message
     cout << endl <<
@@ -76,8 +77,11 @@ System::System(ORBVocabulary *voc, const QJsonObject settingsFile, const eSensor
     mptLocalMapping = new thread(&ORB_SLAM2::LocalMapping::Run,mpLocalMapper);
 
     //Initialize the Loop Closing thread and launch
+    mptLoopClosing = nullptr;
     mpLoopCloser = new LoopClosing(mpMap, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR);
-    mptLoopClosing = new thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
+    if (mLoopClosing) {
+      mptLoopClosing = new thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
+    }
 
     //Initialize the Viewer thread and launch
     if(bUseViewer)
@@ -286,7 +290,9 @@ void System::Reset()
 void System::Shutdown()
 {
     mpLocalMapper->RequestFinish();
-    mpLoopCloser->RequestFinish();
+    if (mptLoopClosing) {
+      mpLoopCloser->RequestFinish();
+    }
     if(mpViewer)
     {
         mpViewer->RequestFinish();
@@ -295,7 +301,9 @@ void System::Shutdown()
     }
 
     // Wait until all thread have effectively stopped
-    while(!mpLocalMapper->isFinished() || !mpLoopCloser->isFinished() || mpLoopCloser->isRunningGBA())
+    while(!mpLocalMapper->isFinished() ||
+          (mptLoopClosing && !mpLoopCloser->isFinished()) ||
+          mpLoopCloser->isRunningGBA())
     {
         usleep(5000);
     }

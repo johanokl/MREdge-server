@@ -129,6 +129,11 @@ int main(int argc, char *argv[])
         "Log the time and print results after 60 seconds.");
   parser.addOption(logTimeOption);
 
+  QCommandLineOption disableLoopClosingOption(
+        QStringList() << "n" << "loopclosing",
+        "Disable loop closing in ORB-SLAM2.");
+  parser.addOption(disableLoopClosingOption);
+
   parser.process(app);
 
   if (parser.isSet(tcpOption)) {
@@ -143,9 +148,6 @@ int main(int argc, char *argv[])
   }
 
   bool benchmarkingOptionEnabled = parser.isSet(benchmarkingOption);
-  bool displayOptionEnabled = parser.isSet(displayOption);
-  bool logTimeOptionEnabled = parser.isSet(logTimeOption);
-  bool identifyColorFrameOptionEnabled = parser.isSet(identifyColorFrameOption);
 
 #ifndef ENABLE_WIDGET_SUPPORT
   if (displayOptionEnabled) {
@@ -157,9 +159,9 @@ int main(int argc, char *argv[])
   MRServer myServer;
 
   myServer.setBenchmarkingMode(benchmarkingOptionEnabled);
-  myServer.setLogTime(logTimeOptionEnabled);
-  myServer.setDisplayResults(displayOptionEnabled);
-  myServer.setIdentifyColorFrame(identifyColorFrameOptionEnabled);
+  myServer.setLogTime(parser.isSet(logTimeOption));
+  myServer.setDisplayResults(parser.isSet(displayOption));
+  myServer.setIdentifyColorFrame(parser.isSet(identifyColorFrameOption));
 
   if (parser.isSet(cannyFilterOption)) {
     fDebug << "Using CANNY FILTER";
@@ -167,7 +169,11 @@ int main(int argc, char *argv[])
   } else if (parser.isSet(echoImageOption)) {
     fDebug << "Using ECHO IMAGE";
     myServer.setMixedRealityFramework(MRServer::ECHOIMAGE);
+  } else if (parser.isSet(disableLoopClosingOption)) {
+    myServer.setMixedRealityFramework(MRServer::ORB_SLAM2_NO_LC);
+    myServer.loadVoc(vocPath);
   } else {
+    myServer.setMixedRealityFramework(MRServer::ORB_SLAM2);
     myServer.loadVoc(vocPath);
   }
 

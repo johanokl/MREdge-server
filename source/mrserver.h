@@ -46,8 +46,9 @@ class MRServer : public QObject {
 public:
   enum CV_FRAMEWORKS {
     CANNYFILTER=0,
-    ORB_SLAM2=1,
-    ECHOIMAGE=2
+    ECHOIMAGE=1,
+    ORB_SLAM2=2,
+    ORB_SLAM2_NO_LC=3
   };
 
   MRServer();

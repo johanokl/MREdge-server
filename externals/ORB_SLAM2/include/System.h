@@ -61,7 +61,8 @@ public:
 public:
 
     // Initialize the SLAM system. It launches the Local Mapping, Loop Closing and Viewer threads.
-    System(ORBVocabulary *voc, const QJsonObject settingsFile, const eSensor sensor, const bool bUseViewer);
+    System(ORBVocabulary *voc, const QJsonObject settingsFile, const eSensor sensor,
+           const bool bUseViewer, bool loopClosing);
 
     // Proccess the given stereo frame. Images must be synchronized and rectified.
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
@@ -176,6 +177,8 @@ private:
     std::vector<MapPoint*> mTrackedMapPoints;
     std::vector<cv::KeyPoint> mTrackedKeyPointsUn;
     std::mutex mMutexState;
+
+    bool mLoopClosing;
 };
 
 }// namespace ORB_SLAM

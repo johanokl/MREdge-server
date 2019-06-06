@@ -27,13 +27,16 @@ namespace MREdge {
  * @param session session id
  * @param voc ORBVocabulary file with Bag of Words for image parsing.
  */
-OrbSlamProcesser::OrbSlamProcesser(qint32 session, ORB_SLAM2::ORBVocabulary *voc, bool benchmarking)
+OrbSlamProcesser::OrbSlamProcesser(
+    qint32 session, ORB_SLAM2::ORBVocabulary *voc,
+    bool benchmarking, bool loopClosing)
 {
   mSession = session;
   mVocabulary = voc;
   mSLAM = nullptr;
   mViewerAR = nullptr;
   mCalibrateMode = false;
+  mLoopClosing = loopClosing;
   mBenchmarking = benchmarking;
   mRunning = true;
 }
@@ -113,7 +116,8 @@ void OrbSlamProcesser::setConfig(QJsonObject calibration)
           mVocabulary,
           calibration,
           ORB_SLAM2::System::MONOCULAR,
-          false);
+          false,
+          mLoopClosing);
 
     double fps = calibration.value("Camera.fps").toDouble(30);
     mViewerAR->setSLAM(mSLAM);

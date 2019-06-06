@@ -411,6 +411,10 @@ void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
         session->videoreceiver->start(format, useJitterbuffer);
       }
     }
+    if (jsonObject.contains("MRFoundTime")) {
+      int time = jsonObject["MRFoundTime"].toInt();
+      fDebug << "MR Object found at time: " << time;
+    }
     if (jsonObject.contains("Camera.width") &&
         jsonObject.contains("Camera.height")) {
       int width = jsonObject["Camera.width"].toInt();
@@ -501,6 +505,37 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
   mTcpCon->setLogTime(mLogTime, mUptime);
   mUdpCon->setLogTime(mLogTime, mUptime);
 
+
+  ImageProcesser *imageprocesser;
+  switch (mCvFramework) {
+  case CANNYFILTER:
+    imageprocesser = new CannyFilter(sessionId);
+    break;
+  case ECHOIMAGE:
+    imageprocesser = new EchoImage(sessionId);
+    break;
+  case ORB_SLAM2:
+    imageprocesser = new OrbSlamProcesser(sessionId, mpVocabulary, mBenchmarking, true);
+    break;
+  case ORB_SLAM2_NO_LC:
+    imageprocesser = new OrbSlamProcesser(sessionId, mpVocabulary, mBenchmarking, false);
+    break;
+  default:
+    return;
+  }
+
+  if (mReplaceVideoFeed) {
+    imageprocesser->setAllowAllSources(true);
+  }
+
+  session->imageprocesser = imageprocesser;
+  imageprocesser->setLogTime(mLogTime);
+  imageprocesser->setIdentifyColorFrame(mIdentifyColorFrame);
+  imageprocesser->moveToThread(new QThread(this));
+  imageprocesser->thread()->start();
+  session->imageprocesser->setEmitMetadata(true);
+
+
   auto videotransmitter = new VideoTransmitter(sessionId, host);
   videotransmitter->setLogTime(mLogTime, mUptime);
   videotransmitter->setBenchmarkingMode(mBenchmarking);
@@ -518,28 +553,6 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
                      this, &MRServer::videoReceiverReady);
   }
 
-  ImageProcesser *imageprocesser;
-  switch (mCvFramework) {
-  case CANNYFILTER:
-    imageprocesser = new CannyFilter(sessionId);
-    break;
-  case ECHOIMAGE:
-    imageprocesser = new EchoImage(sessionId);
-    break;
-  default:
-    imageprocesser = new OrbSlamProcesser(sessionId, mpVocabulary, mBenchmarking);
-  }
-
-  if (mReplaceVideoFeed) {
-    imageprocesser->setAllowAllSources(true);
-  }
-
-  session->imageprocesser = imageprocesser;
-  imageprocesser->setLogTime(mLogTime);
-  imageprocesser->setIdentifyColorFrame(mIdentifyColorFrame);
-  imageprocesser->moveToThread(new QThread(this));
-  imageprocesser->thread()->start();
-  session->imageprocesser->setEmitMetadata(true);
   auto videoreceiver = session->videoreceiver;
 
 #ifdef ENABLE_WIDGET_SUPPORT 

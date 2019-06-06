@@ -47,7 +47,8 @@ class OrbSlamProcesser : public ImageProcesser {
   typedef std::vector<cv::Point2f>  imgPoints; // image point (2D) for one image
 
 public:
-  explicit OrbSlamProcesser(qint32 session, ORB_SLAM2::ORBVocabulary *voc, bool benchmarking);
+  explicit OrbSlamProcesser(qint32 session, ORB_SLAM2::ORBVocabulary *voc,
+                            bool benchmarking, bool loopClosing);
   ~OrbSlamProcesser() override;
   void setDebugMode(bool enable) override;
 
@@ -77,6 +78,7 @@ private:
   ViewerAR *mViewerAR;
   QString m3DObjectType;
   std::thread* mViewerARthread;
+  bool mLoopClosing;
 };
 
 }

@@ -176,16 +176,10 @@ GstFlowReturn frame_received_callback(GstAppSink *appsink, gpointer data)
   GstMapInfo map;
   gst_buffer_map(buffer, &map, GST_MAP_READ);
   // Convert gstreamer data to OpenCV Mat
-  // Copy data to buffer
-  auto imgbuf = new quint8[static_cast<size_t>(width * height * 3)];
-  memcpy(imgbuf, map.data, static_cast<size_t>(width * height * 3));
   auto currFrame = cvMatPtr(new cv::Mat(cv::Size(width, height), CV_8UC3,
-                                        reinterpret_cast<char *>(imgbuf),
+                                        reinterpret_cast<char *>(map.data),
                                         cv::Mat::AUTO_STEP));
   ctx->frames_sent++;
-  //fDebug << QString("Received image: id: %1 (size %2x%3)")
-  //          .arg(ctx->frames_sent)
-  //          .arg(currFrame->size().width).arg(currFrame->size().height);
   auto time_slice = ctx->timer.elapsed() / 1000;
   ctx->frames_processed_per_time_slice[time_slice] += 1;
   ctx->parent->parent()->newMat(ctx->frames_sent, currFrame);
@@ -462,8 +456,6 @@ void GStreamerReceiver::start(VideoStreamer::Format format, QString destHost, bo
   auto insrc = gst_bin_get_by_name(reinterpret_cast<GstBin *>(pipeline), "insrc");
   auto sink = gst_bin_get_by_name(reinterpret_cast<GstBin *>(pipeline), "sink");
   gst_app_sink_set_emit_signals(reinterpret_cast<GstAppSink *>(sink), true);
-  //gst_app_sink_set_drop(reinterpret_cast<GstAppSink *>(sink), true);
-  //gst_app_sink_set_max_buffers(reinterpret_cast<GstAppSink *>(sink), 1);
   GstAppSinkCallbacks callbacks = {
     eos_stream_callback, new_preroll_callback, frame_received_callback, {nullptr}};
   gst_app_sink_set_callbacks(reinterpret_cast<GstAppSink *>(sink), &callbacks,
@@ -472,7 +464,7 @@ void GStreamerReceiver::start(VideoStreamer::Format format, QString destHost, bo
   // Declare bus
   auto bus = gst_pipeline_get_bus(reinterpret_cast<GstPipeline *>(pipeline));
   gst_bus_add_watch(bus, gst_bus_callbacks, mCtx);
-  //gst_object_unref(bus);
+  gst_object_unref(bus);
 
   gst_element_set_state(pipeline, GST_STATE_PAUSED);
   gint port;

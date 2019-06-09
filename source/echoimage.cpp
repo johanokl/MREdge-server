@@ -48,18 +48,36 @@ void EchoImage::process(qint32 session, quint32 frameid, cvMatPtr image)
   if (mRunning && mLogTime) {
     processingfinished.insert(frameid, mUptime->nsecsElapsed());
   }
+  int metadata = 0;
+  cv::Mat dstImage = *image;
+
+  bool colorFrame = false;
+  if (mIdentifyColorFrame) {
+    colorFrame = true;
+    for (int i = 0; i < 10; i++) {
+      unsigned char * p = dstImage.ptr(20 * i,  20 * i);
+      if (p[0] != 252 || p[1] != 0 || p[2] != 252) {
+         colorFrame = false;
+         break;
+      }
+    }
+    if (colorFrame) {
+      //fDebug << "Color frame found";
+      metadata = 2;
+      dstImage = cv::Scalar(255, 0, 255);
+    }
+  }
   if (mEmitJPEG) {
-    cv::Mat dstImage;
     cvtColor(*image, dstImage, cv::COLOR_BGR2RGB);
     emit sendFile(mSession, NetworkConnection::File(
                     (mEmitMetadata ?
                        NetworkConnection::FileType::IMAGE_WITH_METADATA :
                        NetworkConnection::FileType::IMAGE),
-                    frameid, jpegFromMat(dstImage, mEmitMetadata, 0)));
+                    frameid, jpegFromMat(dstImage, mEmitMetadata, metadata)));
   }
   if (mEmitQImage) {
     emit sendQImage(mSession, frameid,
-                    QImagePtr(new QImage(qImageFromMat(*image))));
+                    QImagePtr(new QImage(qImageFromMat(dstImage))));
   }
 }
 

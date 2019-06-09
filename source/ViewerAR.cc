@@ -28,6 +28,7 @@
 #include <QString>
 #include <QDateTime>
 #include <GL/gl.h>
+#include <QElapsedTimer>
 
 using namespace std;
 
@@ -80,6 +81,9 @@ void ViewerAR::Run()
     }
   }
 
+  QElapsedTimer testTimer;
+  testTimer.start();
+
 #ifndef DISABLE_IMAGE_OUTPUT
 #ifdef RENDER_WITH_PANGOLIN
 #ifdef RENDER_PANGOLIN_HEADLESS
@@ -122,6 +126,8 @@ void ViewerAR::Run()
 
   mpSystem->DeactivateLocalizationMode();
 
+  qint64 startTime;
+
   while (mRunning) {
 #ifndef DISABLE_IMAGE_OUTPUT
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -135,6 +141,9 @@ void ViewerAR::Run()
 #endif
 
     int arData = 0;
+    if (mBenchmarking) {
+      startTime = testTimer.nsecsElapsed();
+    }
 
     // Get last image and its computed pose from SLAM
     getImagePose(frameid, im, Tcw, slamStatus, vKeys, vMPs);
@@ -306,6 +315,9 @@ void ViewerAR::Run()
 #endif
 #endif
     emit newImageReady(frameid, outImage, arData);
+    if (mBenchmarking) {
+      fDebug << "ViewerAR: mSec spent rendering: " << (testTimer.nsecsElapsed() - startTime) / 1000000;
+    }
 
 #ifndef USE_QMUTEX_AR
     usleep(mT * 1000);

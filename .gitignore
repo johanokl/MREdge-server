@@ -5,6 +5,7 @@ Mock
 Output
 MREdgeServer
 ORBvoc.txt
+*.csv
 
 # C++ objects and libs
 *.slo

@@ -33,7 +33,8 @@ public:
     static const qint16 CALIBRATION = 5;
     static const qint16 TRIGGER_A = 6;
     static const qint16 TRIGGER_B = 7;
-    static const qint16 TRIGGER_C = 8;
+    static const qint16 PING = 21;
+    static const qint16 PONG = 22;
   };
 
   class File {

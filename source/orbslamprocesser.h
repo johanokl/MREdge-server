@@ -48,7 +48,7 @@ class OrbSlamProcesser : public ImageProcesser {
 
 public:
   explicit OrbSlamProcesser(qint32 session, ORB_SLAM2::ORBVocabulary *voc,
-                            bool benchmarking, bool loopClosing);
+                            bool benchmarking, bool logTimes, bool loopClosing);
   ~OrbSlamProcesser() override;
   void setDebugMode(bool enable) override;
 
@@ -73,6 +73,7 @@ private:
   ORB_SLAM2::ORBVocabulary *mVocabulary;
   ORB_SLAM2::System *mSLAM;
   bool mBenchmarking;
+  bool mLogTime;
   cv::Mat mK;
   cv::Mat mDistCoef;
   ViewerAR *mViewerAR;

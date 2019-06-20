@@ -60,7 +60,7 @@ public:
 
   static QStringList AR_OBJECT_TYPES;
 
-  ViewerAR(int width, int height, const bool benchmarking);
+  ViewerAR(int width, int height, const bool benchmarking, const bool logTime);
 
   void setFPS(const double fps){
     mFPS = fps;
@@ -148,6 +148,7 @@ private:
   bool mForceColor;
   QString m3DObjectType;
   bool mBenchmarking;
+  bool mLogTime;
 };
 
 

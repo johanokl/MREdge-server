@@ -64,6 +64,7 @@ private:
   QElapsedTimer* mUptime;
   bool mLogTime = false;
   QMap<quint32, qint64> mFramesProcessedNsec;
+  bool mLogWritten;
 
 };
 

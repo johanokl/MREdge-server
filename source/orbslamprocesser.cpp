@@ -29,11 +29,12 @@ namespace MREdge {
  */
 OrbSlamProcesser::OrbSlamProcesser(
     qint32 session, ORB_SLAM2::ORBVocabulary *voc,
-    bool benchmarking, bool loopClosing)
+    bool benchmarking, bool logTime, bool loopClosing)
 {
   mSession = session;
   mVocabulary = voc;
   mSLAM = nullptr;
+  mLogTime = logTime;
   mViewerAR = nullptr;
   mCalibrateMode = false;
   mLoopClosing = loopClosing;
@@ -110,7 +111,7 @@ void OrbSlamProcesser::setConfig(QJsonObject calibration)
   QSize imageSize = QSize(calibration.value("Camera.width").toInt(),
                           calibration.value("Camera.height").toInt());
   if (imageSize != mImgSize) {
-    mViewerAR = new ViewerAR(imageSize.width(), imageSize.height(), mBenchmarking);
+    mViewerAR = new ViewerAR(imageSize.width(), imageSize.height(), mBenchmarking, mLogTime);
     mViewerAR->set3DObjectType(m3DObjectType);
     mSLAM = new ORB_SLAM2::System(
           mVocabulary,

@@ -71,6 +71,7 @@ public:
 private:
   GStreamerReceiverContext *mCtx;
   VideoReceiver *mParent;
+  bool mLogWritten;
 };
 
 }

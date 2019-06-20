@@ -14,6 +14,7 @@
 #include <QFile>
 #include <QMetaEnum>
 #include <QTimer>
+#include <QTime>
 
 #define WRITE_LOG_TRIGGER_TIME 58
 
@@ -39,7 +40,6 @@ public:
   bool initialized;
   char _a, _b, _c;
   QSize videoSize;
-  QElapsedTimer timer;
   QMap<int, int> frames_processed_per_time_slice;
 };
 
@@ -64,6 +64,7 @@ VideoTransmitter::VideoTransmitter(qint32 session, QString destHost)
   mGStreamerTransmitter->moveToThread(new QThread());
   mGStreamerTransmitter->thread()->start();
   mUptime = nullptr;
+  mLogWritten = false;
 
   mWriteLogTimer = new QTimer(this);
   connect(mWriteLogTimer, &QTimer::timeout,
@@ -88,6 +89,9 @@ VideoTransmitter::~VideoTransmitter()
 {
   mWriteLogTimer->stop();
   delete mWriteLogTimer;
+  if (getBenchmarkingMode()) {
+    writeLog();
+  }
   if (mStreamContext && mStreamContext->mainloop != nullptr && g_main_loop_is_running(mStreamContext->mainloop)) {
     g_main_loop_quit(mStreamContext->mainloop);
   }
@@ -98,13 +102,20 @@ VideoTransmitter::~VideoTransmitter()
  */
 void VideoTransmitter::writeLog()
 {
+  if (mLogWritten) {
+    return;
+  }
+  mLogWritten = true;
   QString formatString;
   if (mFormat == VideoStreamer::Format::H264_UDP) {
     formatString = "H264_UDP";
   } else if (mFormat == VideoStreamer::Format::H264_TCP) {
     formatString = "H264_TCP";
   }
-  QString filename = QString("transmitter%1.csv").arg(formatString);
+  QString filename = QString("transmitter_fps_%1_%2.csv")
+      .arg(formatString).arg(QTime::currentTime().toString());
+  filename.replace(QString(":"), QString(""));
+
   QFile file(filename);
   if (file.open(QIODevice::WriteOnly | QIODevice::Append | QFile::Text)) {
     file.seek(file.size());
@@ -237,7 +248,8 @@ void VideoTransmitter::processQImage(qint32 session, quint32 frameid, QImagePtr 
   gst_buffer_set_flags(buffer, GST_BUFFER_FLAG_LIVE);
   buffer->pts = static_cast<GstClockTime>(mTimer->nsecsElapsed());
   auto result = gst_app_src_push_buffer(mStreamContext->appsrc, buffer);
-  auto time_slice = mStreamContext->timer.elapsed() / 1000;
+
+  auto time_slice = mTimer->elapsed() / 1000;
   mStreamContext->frames_processed_per_time_slice[time_slice] += 1;
   if (mLogTime && mUptime) {
     mFramesProcessedNsec.insert(frameid, mUptime->nsecsElapsed());
@@ -427,7 +439,6 @@ void GStreamerTransmitter::start(QString destHost, quint16 destPort,
   g_signal_connect(bus, "message::qos", G_CALLBACK(gstreamer_qos_callback), ctx);
   gst_object_unref(bus);
 
-  ctx->timer.start();
   emit started(ctx);
 
   g_main_loop_run(ctx->mainloop);

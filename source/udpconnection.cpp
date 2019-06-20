@@ -111,9 +111,10 @@ void UdpConnection::setPacketSize(qint32 session, qint32 packetsize)
  */
 void UdpConnection::sendFile(qint32 session, File file)
 {
-  if (!(file.type == NetworkConnection::FileType::IMAGE ||
+  if (file.type == NetworkConnection::FileType::PONG &&
+      (!(file.type == NetworkConnection::FileType::IMAGE ||
         file.type == NetworkConnection::FileType::IMAGE_WITH_METADATA) ||
-      !sendImagesForSession(session)) {
+      !sendImagesForSession(session))) {
     return;
   }
   mSessionsMutex.lock();

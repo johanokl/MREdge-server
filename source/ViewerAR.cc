@@ -42,9 +42,11 @@ QStringList ViewerAR::AR_OBJECT_TYPES = QStringList()
 /**
  * @brief ViewerAR::ViewerAR
  */
-ViewerAR::ViewerAR(int width, int height, const bool benchmarking)
+ViewerAR::ViewerAR(int width, int height, const bool benchmarking,
+                   const bool logTime)
   : mRunning(true), mWidth(width), mHeight(height),
-    m3DObjectType("CUBE_A"), mBenchmarking(benchmarking) {
+    m3DObjectType("CUBE_A"), mBenchmarking(benchmarking),
+    mLogTime(logTime) {
 }
 
 /**
@@ -81,8 +83,8 @@ void ViewerAR::Run()
     }
   }
 
-  QElapsedTimer testTimer;
-  testTimer.start();
+  QElapsedTimer processingTimeTimer;
+  processingTimeTimer.start();
 
 #ifndef DISABLE_IMAGE_OUTPUT
 #ifdef RENDER_WITH_PANGOLIN
@@ -127,10 +129,17 @@ void ViewerAR::Run()
   mpSystem->DeactivateLocalizationMode();
 
   qint64 startTime;
+  int framesWithObject = 0;
+
+  QMap<int, qint64> framesTime;
+
+  int frames = 0;
 
   while (mRunning) {
 #ifndef DISABLE_IMAGE_OUTPUT
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    frames++;
 
     // Activate camera view
 #ifdef RENDER_WITH_PANGOLIN
@@ -141,12 +150,14 @@ void ViewerAR::Run()
 #endif
 
     int arData = 0;
-    if (mBenchmarking) {
-      startTime = testTimer.nsecsElapsed();
-    }
 
     // Get last image and its computed pose from SLAM
     getImagePose(frameid, im, Tcw, slamStatus, vKeys, vMPs);
+
+    if (mLogTime) {
+      startTime = processingTimeTimer.nsecsElapsed();
+    }
+
 
 #ifndef DISABLE_IMAGE_OUTPUT
     glColor3f(1.0, 1.0, 1.0);
@@ -167,6 +178,16 @@ void ViewerAR::Run()
 
     // Draw virtual things
     if (slamStatus == 2) {
+      if (mBenchmarking) {
+        if (!m3dObjectPoses.empty()) {
+          framesWithObject++;
+          if (framesWithObject > 15) {
+            mRemove3dObject = true;
+          }
+        } else {
+          framesWithObject = 0;
+        }
+      }
       if (mAdd3dObject || mRemove3dObject) {
         if (!m3dObjectPoses.empty()) {
           for (size_t i = 0; i < m3dObjectPoses.size(); i++) {
@@ -185,7 +206,7 @@ void ViewerAR::Run()
           mAdd3dObject = false;
         }
       }
-      if (!m3dObjectPoses.empty()) {
+      if (!m3dObjectPoses.empty()) {        
         // Recompute plane if there has been a loop closure or global BA
         // In localization mode, map is not updated so we do not need to recompute
         bool bRecompute = false;
@@ -231,31 +252,9 @@ void ViewerAR::Run()
             }
           }
         }
-      } else {
-        // We have a point cloud but not any 3D object
-        arData = 1;
-        if (mBenchmarking) {
-#ifndef DISABLE_IMAGE_OUTPUT
-          glDisable(GL_DEPTH_TEST);
-          glMatrixMode(GL_MODELVIEW);
-          glLoadIdentity();
-          glMatrixMode(GL_PROJECTION);
-          glLoadIdentity();
-          gluOrtho2D(-1000, 1000, -1000, 1000);
-          glLoadIdentity();
-          glBegin(GL_POLYGON);
-          glColor3f(0, 1, 0);
-          glVertex2f(-1000, -1000);
-          glVertex2f(1000, -1000);
-          glVertex2f(1000, 1000);
-          glVertex2f(-1000, 1000);
-          glEnd();
-          glEnable(GL_DEPTH_TEST);
-          glMatrixMode(GL_MODELVIEW);
-          glLoadIdentity();
-#endif
-        }
       }
+    } else if (mBenchmarking) {
+      framesWithObject = 0;
     }
     if (mForceColor) {
       arData = 2;
@@ -315,14 +314,23 @@ void ViewerAR::Run()
 #endif
 #endif
     emit newImageReady(frameid, outImage, arData);
-    if (mBenchmarking) {
-      fDebug << "ViewerAR: mSec spent rendering: " << (testTimer.nsecsElapsed() - startTime) / 1000000;
+    if (mLogTime) {
+      framesTime.insert(frames, (processingTimeTimer.nsecsElapsed() - startTime) / 1000000);
     }
 
 #ifndef USE_QMUTEX_AR
     usleep(mT * 1000);
 #endif
   }
+
+  QMapIterator<int, qint64> framesTimeIt(framesTime);
+  while (framesTimeIt.hasNext()) {
+    framesTimeIt.next();
+    fDebug << QString("frametime,%1,%2")
+              .arg(framesTimeIt.key()).arg(framesTimeIt.value());
+  }
+
+
 #ifndef DISABLE_IMAGE_OUTPUT
 #ifndef RENDER_WITH_PANGOLIN
   OSMesaDestroyContext(ctx);

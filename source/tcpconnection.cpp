@@ -90,9 +90,10 @@ void TcpConnection::sendFileIfLatest(qint32 session, File file)
  */
 void TcpConnection::sendFile(qint32 session, File file)
 {
-  if ((file.type == NetworkConnection::FileType::IMAGE ||
+  if (file.type == NetworkConnection::FileType::PONG ||
+      ((file.type == NetworkConnection::FileType::IMAGE ||
        file.type == NetworkConnection::FileType::IMAGE_WITH_METADATA) &&
-      !sendImagesForSession(session)) {
+      !sendImagesForSession(session))) {
     return;
   }
   if (file.type != NetworkConnection::FileType::IMAGE &&

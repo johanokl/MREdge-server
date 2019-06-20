@@ -33,13 +33,14 @@ public:
     parent = _parent;
     reachedEndOfStream = false;
     running = false;
+    timer = nullptr;
     frames_sent = 0;
   }
   // Share frame between main loop and gstreamer callback
   cvMatPtr latestFrame;
   bool reachedEndOfStream;
   bool running;
-  QElapsedTimer timer;
+  QElapsedTimer* timer;
   QMap<int, int> frames_processed_per_time_slice;
   GMainLoop *mainLoop;
   GStreamerReceiver *parent;
@@ -114,6 +115,9 @@ VideoReceiver::~VideoReceiver()
   }
   mWriteLogTimer->stop();
   delete mWriteLogTimer;
+  if (getBenchmarkingMode()) {
+    mGStreamerReceiver->writeLog();
+  }
 }
 
 /**
@@ -180,7 +184,11 @@ GstFlowReturn frame_received_callback(GstAppSink *appsink, gpointer data)
                                         reinterpret_cast<char *>(map.data),
                                         cv::Mat::AUTO_STEP));
   ctx->frames_sent++;
-  auto time_slice = ctx->timer.elapsed() / 1000;
+  if (ctx->timer == nullptr) {
+    ctx->timer = new QElapsedTimer;
+    ctx->timer->start();
+  }
+  auto time_slice = ctx->timer->elapsed() / 1000;
   ctx->frames_processed_per_time_slice[time_slice] += 1;
   ctx->parent->parent()->newMat(ctx->frames_sent, currFrame);
   gst_buffer_unmap(buffer, &map);
@@ -336,6 +344,7 @@ GStreamerReceiver::GStreamerReceiver(VideoReceiver *parent)
 {
   mParent = parent;
   mCtx = new GStreamerReceiverContext(this);
+  mLogWritten = false;
 }
 
 /**
@@ -351,6 +360,10 @@ GStreamerReceiver::~GStreamerReceiver()
  */
 void GStreamerReceiver::writeLog()
 {
+  if (mLogWritten) {
+    return;
+  }
+  mLogWritten = true;
   QString formatString;
   auto format = parent()->getFormat();
   if (format == VideoStreamer::Format::H264_UDP) {
@@ -358,7 +371,10 @@ void GStreamerReceiver::writeLog()
   } else if (format == VideoStreamer::Format::H264_TCP) {
     formatString = "H264_TCP";
   }
-  QString filename = QString("receiver%1.csv").arg(formatString);
+  QString filename = QString("receiver_fps_%1_%2.csv")
+      .arg(formatString).arg(QTime::currentTime().toString());
+  filename.replace(QString(":"), QString(""));
+
   QFile file(filename);
   if (file.open(QIODevice::WriteOnly | QIODevice::Append | QFile::Text)) {
     file.seek(file.size());
@@ -416,7 +432,7 @@ void GStreamerReceiver::start(VideoStreamer::Format format, QString destHost, bo
           "%1 "
           "rtph264depay ! "
           "h264parse ! "
-          "avdec_h264 ! "
+          "avdec_h264 output-corrupt=false ! "
           "videoconvert ! "
           "video/x-raw,format=(string)RGB ! "
           "videoconvert ! "
@@ -429,7 +445,7 @@ void GStreamerReceiver::start(VideoStreamer::Format format, QString destHost, bo
           "tcpserversrc name=insrc port=0 host=%1 ! "
           "tsdemux ! "
           "h264parse ! "
-          "avdec_h264 ! "
+          "avdec_h264 output-corrupt=false ! "
           "videoconvert ! "
           "video/x-raw,format=(string)RGB ! "
           "videoconvert ! "
@@ -476,8 +492,6 @@ void GStreamerReceiver::start(VideoStreamer::Format format, QString destHost, bo
   emit ready(format, static_cast<quint16>(port));
 
   fDebug << "Port: " << port;
-
-  mCtx->timer.start();
 
   mCtx->mainLoop = g_main_loop_new(nullptr, 0);
   g_main_loop_run(mCtx->mainLoop);

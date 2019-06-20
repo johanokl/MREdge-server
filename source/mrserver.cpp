@@ -464,10 +464,9 @@ void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
       session->imageprocesser->triggerActionB();
     }
     break;
-  case NetworkConnection::FileType::TRIGGER_C:
-    fDebug << sessionId << ": Trigger Action C";
-    if (session->imageprocesser) {
-      session->imageprocesser->triggerActionC();
+  case NetworkConnection::FileType::PING: {
+    emit sendFile(sessionId, NetworkConnection::File(
+                    NetworkConnection::FileType::PONG, 1, nullptr));
     }
     break;
   case NetworkConnection::FileType::CALIBRATION: {
@@ -515,10 +514,10 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
     imageprocesser = new EchoImage(sessionId);
     break;
   case ORB_SLAM2:
-    imageprocesser = new OrbSlamProcesser(sessionId, mpVocabulary, mBenchmarking, true);
+    imageprocesser = new OrbSlamProcesser(sessionId, mpVocabulary, mBenchmarking, mLogTime, true);
     break;
   case ORB_SLAM2_NO_LC:
-    imageprocesser = new OrbSlamProcesser(sessionId, mpVocabulary, mBenchmarking, false);
+    imageprocesser = new OrbSlamProcesser(sessionId, mpVocabulary, mBenchmarking, mLogTime, false);
     break;
   default:
     return;

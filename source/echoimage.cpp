@@ -46,7 +46,7 @@ void EchoImage::process(qint32 session, quint32 frameid, cvMatPtr image)
 {
   Q_UNUSED(session);
   if (mRunning && mLogTime) {
-    processingfinished.insert(frameid, mUptime->nsecsElapsed());
+    mProcessingFinishedTimes.insert(frameid, mUptime->nsecsElapsed());
   }
   int metadata = 0;
   cv::Mat dstImage = *image;

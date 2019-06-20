@@ -149,6 +149,8 @@ private:
   QString m3DObjectType;
   bool mBenchmarking;
   bool mLogTime;
+  int mTotalTrackedPoints;
+  int mNumFramesDrawn;
 };
 
 

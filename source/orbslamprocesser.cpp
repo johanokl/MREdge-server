@@ -53,6 +53,7 @@ OrbSlamProcesser::~OrbSlamProcesser()
     mSLAM->Shutdown();
   }
   if (mViewerAR) {
+    fDebug << "Shutting down Graphics Module";
     mViewerAR->Stop();
   }
 }
@@ -153,7 +154,7 @@ void OrbSlamProcesser::setConfig(QJsonObject calibration)
     QObject::connect(mViewerAR, &ViewerAR::newImageReady,
                      [=](quint32 frameid, QImagePtr img, int metadata) {
       if (mRunning && mLogTime) {
-        processingfinished.insert(frameid, mUptime->nsecsElapsed());
+        mProcessingFinishedTimes.insert(frameid, mUptime->nsecsElapsed());
       }
       if (mRunning && mEmitJPEG) {
         emit sendFile(

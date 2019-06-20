@@ -83,8 +83,8 @@ protected:
   bool mIdentifyColorFrame = false;
   int mSkippedImages = 0;
   bool mLogTime = false;
-  QMap<quint32, qint64> processingstarted;
-  QMap<quint32, qint64> processingfinished;
+  QMap<quint32, qint64> mProcessingStartedTimes;
+  QMap<quint32, qint64> mProcessingFinishedTimes;
   QElapsedTimer* mUptime;
   bool mRunning;
 };

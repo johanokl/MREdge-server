@@ -43,17 +43,23 @@ QStringList ViewerAR::AR_OBJECT_TYPES = QStringList()
  * @brief ViewerAR::ViewerAR
  */
 ViewerAR::ViewerAR(int width, int height, const bool benchmarking,
-                   const bool logTime)
-  : mRunning(true), mWidth(width), mHeight(height),
-    m3DObjectType("CUBE_A"), mBenchmarking(benchmarking),
-    mLogTime(logTime) {
+                   const bool logTime) {
+  mRunning = true;
+  mWidth = width;
+  mHeight = height;
+  m3DObjectType = "CUBE_A";
+  mBenchmarking = benchmarking;
+  mLogTime = logTime;
+  mTotalTrackedPoints = 0;
+  mNumFramesDrawn = 0;
 }
 
 /**
  * @brief ViewerAR::set3DObjectType
  * @param objectTypeName
  */
-void ViewerAR::set3DObjectType(QString objectTypeName) {
+void ViewerAR::set3DObjectType(QString objectTypeName)
+{
   m3DObjectMutex.lock();
   mPoseReady = true;
   if (!ViewerAR::AR_OBJECT_TYPES.contains(objectTypeName)) {
@@ -96,8 +102,15 @@ void ViewerAR::Run()
                                 mWidth, mHeight);
 #endif
   pangolin::View& d_image = pangolin::Display("image");
-  d_image.SetBounds(0, 1.0f, 0, 1.0f, (float)mWidth / mHeight);
+  d_image.SetBounds(0, 1.0f, 0, 1.0f, (float)mWidth / mHeight); // -?
   d_image.SetLock(pangolin::LockLeft, pangolin::LockTop);
+
+
+  pangolin::GlTexture color_buffer(mWidth, mHeight);
+  pangolin::GlRenderBuffer depth_buffer(mWidth, mHeight);
+  pangolin::GlFramebuffer fbo_buffer(color_buffer, depth_buffer);
+  fbo_buffer.Bind();
+
 #else
   OSMesaContext ctx = OSMesaCreateContextExt(OSMESA_RGB, 16, 0, 0, nullptr);
   if (!ctx) {
@@ -128,7 +141,7 @@ void ViewerAR::Run()
 
   mpSystem->DeactivateLocalizationMode();
 
-  qint64 startTime;
+  qint64 startTime = 0;
   int framesWithObject = 0;
 
   QMap<int, qint64> framesTime;
@@ -157,7 +170,6 @@ void ViewerAR::Run()
     if (mLogTime) {
       startTime = processingTimeTimer.nsecsElapsed();
     }
-
 
 #ifndef DISABLE_IMAGE_OUTPUT
     glColor3f(1.0, 1.0, 1.0);
@@ -313,7 +325,9 @@ void ViewerAR::Run()
     }
 #endif
 #endif
+
     emit newImageReady(frameid, outImage, arData);
+
     if (mLogTime) {
       framesTime.insert(frames, (processingTimeTimer.nsecsElapsed() - startTime) / 1000000);
     }
@@ -334,8 +348,18 @@ void ViewerAR::Run()
 #ifndef DISABLE_IMAGE_OUTPUT
 #ifndef RENDER_WITH_PANGOLIN
   OSMesaDestroyContext(ctx);
+#else
+  fbo_buffer.Unbind();
 #endif
 #endif
+
+  if (mLogTime) {
+    fDebug << "------------------------------------------------------";
+    fDebug << "Frames drawn: " << mNumFramesDrawn;
+    fDebug << "Total tracked points: " << mTotalTrackedPoints;
+    fDebug << "Average tracked points per frame: " << mTotalTrackedPoints / mNumFramesDrawn;
+    fDebug << "------------------------------------------------------";
+  }
 }
 
 /**
@@ -588,12 +612,16 @@ void ViewerAR::draw3DObject(const double &size, const double x, const double y, 
  */
 void ViewerAR::drawTrackedPoints(const std::vector<cv::KeyPoint> &vKeys, const std::vector<ORB_SLAM2::MapPoint *> &vMPs, cv::Mat &im)
 {
+  int mTotalTrackedPointsThisFrame = 0;
   const size_t N = vKeys.size();
   for (size_t i = 0; i < N; i++) {
     if (vMPs[i]) {
+      mTotalTrackedPointsThisFrame++;
       cv::circle(im, vKeys[i].pt, 1, cv::Scalar(0, 255, 0), -1);
     }
   }
+  mTotalTrackedPoints += mTotalTrackedPointsThisFrame;
+  mNumFramesDrawn += 1;
 }
 
 /**

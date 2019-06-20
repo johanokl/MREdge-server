@@ -49,9 +49,7 @@ QMap<quint32, qint64> NetworkConnection::getProcessingTimes(qint32 session)
     retMap = *timelogs;
     retMap.detach();
   }
-  fDebug << "Retmap size:" << retMap.size();
   retMap.remove(retMap.lastKey());
-  fDebug << "Retmap size:" << retMap.size();
   return retMap;
 }
 

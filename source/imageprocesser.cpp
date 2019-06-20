@@ -237,7 +237,7 @@ void ImageProcesser::processMat(qint32 session, quint32 frameid, cvMatPtr mat)
     mSkippedImages = 0;
   }
   if (mLogTime) {
-    processingstarted.insert(frameid, mUptime->nsecsElapsed());
+    mProcessingStartedTimes.insert(frameid, mUptime->nsecsElapsed());
   }
   process(mSession, frameid, mat);
 }
@@ -250,13 +250,13 @@ void ImageProcesser::processMat(qint32 session, quint32 frameid, cvMatPtr mat)
 const QMap<quint32, qint32> ImageProcesser::getProcessingTimes()
 {
   mRunning = false;
-  QMapIterator<quint32, qint64> processedIt(processingfinished);
+  QMapIterator<quint32, qint64> processedIt(mProcessingFinishedTimes);
   QMap<quint32, qint32> retMap;
   while (processedIt.hasNext()) {
     processedIt.next();
-    if (processingstarted.contains(processedIt.key())) {
+    if (mProcessingStartedTimes.contains(processedIt.key())) {
       retMap.insert(processedIt.key(),
-                    ((processedIt.value() - processingstarted.value(processedIt.key()))
+                    ((processedIt.value() - mProcessingStartedTimes.value(processedIt.key()))
                      / 1000000));
     }
   }

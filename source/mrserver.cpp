@@ -98,7 +98,7 @@ MRServer::MRServer()
       }
     }
   }
-    qDebug() << " +------------------------------------";
+  qDebug() << " +------------------------------------";
 
 
 }
@@ -626,7 +626,7 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
                      [=](qint32 session, quint32 frameid, cvMatPtr image) {
       Q_UNUSED(frameid);
       this->displayImage(session + 1000, ImageProcesser::qImageFromMat(*image));
-      });
+    });
   }
   QJsonObject retObject;
   retObject.insert("UdpPort", mUdpCon->getPort());
@@ -674,11 +674,11 @@ void MRServer::removeSession(qint32 sessionId)
     int processedframes = 0;
     quint64 totalprocessingtime = 0;
     quint64 totalcvtime = 0;
-    QMapIterator<quint32, qint64> arrivedIt(videoarrivedtimes);
     std::vector<int> processingMedianVector;
     std::vector<int> mrMedianVector;
     qint64 timeFirst = std::numeric_limits<qint64>::max();
     qint64 timeLast = std::numeric_limits<qint64>::min();
+    QMapIterator<quint32, qint64> arrivedIt(videoarrivedtimes);
     while (arrivedIt.hasNext()) {
       arrivedIt.next();
       if (imagesprocessortimes.contains(arrivedIt.key())) {

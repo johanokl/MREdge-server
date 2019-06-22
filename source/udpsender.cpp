@@ -76,19 +76,15 @@ void UdpSender::sendFileUdp(qint32 session, QString host, quint16 port, qint32 p
   }
 
   mSendBufferFilesMutex.unlock();
-  if (file.data.isNull()) {
-    // Nothing in send queue.
-    sendmutex.unlock();
-    return;
-  }
   // Take the latest file in the pipeline. As this function
   // fDebug << QString("Sending (session=%1, host=%2, port=%3, type=%4, length=%5)")
-  //          .arg(session).arg(host).arg(port).arg(file.type).arg(file.data->length());
+  //           .arg(session).arg(host).arg(port).arg(file.type)
+  //           .arg((file.data != nullptr) ? file.data->length() : 0);
 
   qint32 offset = 0;
-  qint32 totalbytes = file.data->length();
+  qint32 totalbytes = (file.data != nullptr) ? file.data->length() : 0;
   QHostAddress hostAddress(host);
-  while (offset < totalbytes) {
+  while (true) {
     // There are still data to be sent. Create a new packet and send it.
     qint32 currpacketsize = qMin(packetsize, (totalbytes - offset));
     QByteArray datagram;
@@ -100,9 +96,14 @@ void UdpSender::sendFileUdp(qint32 session, QString host, quint16 port, qint32 p
     dstream << static_cast<qint32>(totalbytes);
     dstream << static_cast<qint32>(offset);
     dstream << static_cast<qint16>(currpacketsize);
-    datagram.insert(16, file.data->data() + offset, currpacketsize);
+    if (file.data != nullptr) {
+      datagram.insert(16, file.data->data() + offset, currpacketsize);
+    }
     offset += currpacketsize;
     sendsock->writeDatagram(datagram, hostAddress, port);
+    if (offset >= totalbytes) {
+      break;
+    }
   }
   emit fileSent();
   sendmutex.unlock();

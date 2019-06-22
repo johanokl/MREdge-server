@@ -111,7 +111,7 @@ void UdpConnection::setPacketSize(qint32 session, qint32 packetsize)
  */
 void UdpConnection::sendFile(qint32 session, File file)
 {
-  if (file.type == NetworkConnection::FileType::PONG &&
+  if (file.type != NetworkConnection::FileType::PONG &&
       (!(file.type == NetworkConnection::FileType::IMAGE ||
         file.type == NetworkConnection::FileType::IMAGE_WITH_METADATA) ||
       !sendImagesForSession(session))) {
@@ -126,9 +126,8 @@ void UdpConnection::sendFile(qint32 session, File file)
     return;
   }
   fDebug << QString("sendFile: type=%1, length=%2")
-            .arg(file.type).arg(file.data->size());
+            .arg(file.type).arg((file.data != nullptr) ? file.data->size() : 0);
   // Read target IP, target port, session packet size and pass it to the UDP sender
-  fDebug << "sendFile: fileToSendUdp";
   emit fileToSendUdp(session, std::get<0>(dest), std::get<1>(dest), std::get<2>(dest), file);
 }
 

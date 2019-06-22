@@ -169,8 +169,9 @@ void MRServer::startServer(quint16 tcpPort, quint16 udpPort)
                    mUdpCon, &NetworkConnection::sendFile);
   QObject::connect(this, &MRServer::sendFile,
                    mTcpCon, &NetworkConnection::sendFile);
-
   QObject::connect(mTcpCon, &NetworkConnection::fileReady,
+                   this, &MRServer::dataReceived);
+  QObject::connect(mUdpCon, &NetworkConnection::fileReady,
                    this, &MRServer::dataReceived);
   QObject::connect(mTcpCon, &NetworkConnection::newSession,
                    this, &MRServer::newSession,
@@ -465,6 +466,7 @@ void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
     }
     break;
   case NetworkConnection::FileType::PING: {
+    fDebug << sessionId << ": PING";
     emit sendFile(sessionId, NetworkConnection::File(
                     NetworkConnection::FileType::PONG, 1, nullptr));
     }
@@ -503,7 +505,6 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
   mUdpCon->setSendImagesForSession(sessionId, false);
   mTcpCon->setLogTime(mLogTime, mUptime);
   mUdpCon->setLogTime(mLogTime, mUptime);
-
 
   ImageProcesser *imageprocesser;
   switch (mCvFramework) {

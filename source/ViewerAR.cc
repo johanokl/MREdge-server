@@ -357,7 +357,8 @@ void ViewerAR::Run()
     fDebug << "------------------------------------------------------";
     fDebug << "Frames drawn: " << mNumFramesDrawn;
     fDebug << "Total tracked points: " << mTotalTrackedPoints;
-    fDebug << "Average tracked points per frame: " << mTotalTrackedPoints / mNumFramesDrawn;
+    fDebug << "Average tracked points per frame: " << mTotalTrackedPoints /
+              qMax(mNumFramesDrawn, 1);
     fDebug << "------------------------------------------------------";
   }
 }

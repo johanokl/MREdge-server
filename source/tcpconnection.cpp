@@ -98,8 +98,8 @@ void TcpConnection::sendFile(qint32 session, File file)
   }
   if (file.type != NetworkConnection::FileType::IMAGE &&
        file.type != NetworkConnection::FileType::IMAGE_WITH_METADATA) {
-    fDebug << QString("Sending (session=%1, type=%2, length=%3)")
-              .arg(session).arg(file.type).arg(file.data->length());
+    //fDebug << QString("Sending (session=%1, type=%2, length=%3)")
+    //          .arg(session).arg(file.type).arg(file.data->length());
   }
   mSessionMutex.lock();
   auto sendsock = mSockets.value(session, nullptr);

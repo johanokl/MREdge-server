@@ -74,6 +74,7 @@ public slots:
   void setIdentifyColorFrame(bool enable) { mIdentifyColorFrame = enable; }
   void startServer(quint16 tcpPort, quint16 udpPort);
   void loadVoc(QString path, int poolSize);
+  void setJpegQualityLevel(int level) { mJpegQualityLevel = level; }
   void setMixedRealityFramework(CV_FRAMEWORKS framework) {
     mCvFramework = framework; }
 
@@ -95,6 +96,7 @@ private:
   bool mLogTime;
   QElapsedTimer* mUptime;
   bool mIdentifyColorFrame;
+  int mJpegQualityLevel;
 };
 
 /**

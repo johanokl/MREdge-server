@@ -134,6 +134,12 @@ int main(int argc, char *argv[])
         "Disable loop closing in ORB-SLAM2.");
   parser.addOption(disableLoopClosingOption);
 
+  QCommandLineOption jpegQualityOption(
+        QStringList() << "j" << "jpegquality",
+        "Set the MJPEG image quality level. Default is 80.",
+        "level");
+  parser.addOption(jpegQualityOption);
+
   QCommandLineOption vocPoolSizeOption(
         QStringList() << "p" << "pool",
         "Set the <size> [0, 1, 2, ..] of the pool of vocabulary files at system startup. " \
@@ -175,6 +181,9 @@ int main(int argc, char *argv[])
   myServer.setLogTime(parser.isSet(logTimeOption));
   myServer.setDisplayResults(parser.isSet(displayOption));
   myServer.setIdentifyColorFrame(parser.isSet(identifyColorFrameOption));
+  if (parser.isSet(jpegQualityOption)) {
+    myServer.setJpegQualityLevel(parser.value(jpegQualityOption).toInt());
+  }
 
   if (parser.isSet(cannyFilterOption)) {
     fDebug << "Using CANNY FILTER";

@@ -180,11 +180,6 @@ GstFlowReturn frame_received_callback(GstAppSink *appsink, gpointer data)
   GstMapInfo map;
   gst_buffer_map(buffer, &map, GST_MAP_READ);
   // Convert gstreamer data to OpenCV Mat
-  //quint8 *imagebuf = new quint8[width * height * 3];
-  //memcpy(imagebuf, map.data, width * height * 3);
-  //auto currFrame = cvMatPtr(new cv::Mat(cv::Size(width, height), CV_8UC3,
-  //                                      reinterpret_cast<char *>(imagebuf),
-  //                                      cv::Mat::AUTO_STEP));
   auto currFrame = cvMatPtr(new cv::Mat(cv::Size(width, height), CV_8UC3));
   memcpy(currFrame->data, map.data, width * height * 3);
 

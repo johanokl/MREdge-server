@@ -79,6 +79,7 @@ MRServer::MRServer()
   mDisplayResult = false;
   mReplaceVideoFeed = false;
   mLogTime = false;
+  mJpegQualityLevel = 80;
   mCvFramework = ORB_SLAM2;
   mUptime = new QElapsedTimer();
   mUptime->start();
@@ -527,7 +528,7 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
   mTcpCon->setLogTime(mLogTime, mUptime);
   mUdpCon->setLogTime(mLogTime, mUptime);
 
-  ImageProcesser *imageprocesser;
+  ImageProcesser *imageprocesser = nullptr;
   switch (mCvFramework) {
   case CANNYFILTER:
     imageprocesser = new CannyFilter(sessionId);
@@ -545,10 +546,15 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
     return;
   }
 
+  if (imageprocesser == nullptr) {
+    fDebug << "Could not create image processer.";
+    return;
+  }
+
   if (mReplaceVideoFeed) {
     imageprocesser->setAllowAllSources(true);
   }
-
+  imageprocesser->setJpgegQualityLevel(mJpegQualityLevel);
   session->imageprocesser = imageprocesser;
   imageprocesser->setLogTime(mLogTime);
   imageprocesser->setIdentifyColorFrame(mIdentifyColorFrame);
@@ -644,7 +650,7 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
                      this, &MRServer::displayImage);
     QObject::connect(videoreceiver, &VideoReceiver::matReady,
                      [=](qint32 session, quint32 frameid, cvMatPtr image) {
-      this->displayImage(session + 1000, frameid, ImageProcesser::qImageFromMat(*image));
+      this->displayImage(session + 1000, frameid, imageprocesser->qImageFromMat(*image));
     });
   }
   QJsonObject retObject;

@@ -23,12 +23,12 @@ class ImageProcesser : public QObject
   Q_OBJECT
 
 public:
-  static QImage qImageFromMat(cv::Mat img);
-  static QByteArrayPtr jpegFromQImage(
+  QImage qImageFromMat(cv::Mat img);
+  QByteArrayPtr jpegFromQImage(
       QImage image, bool addmetadata=false, int metadata=0);
-  static QByteArrayPtr jpegFromMat(
+  QByteArrayPtr jpegFromMat(
       cv::Mat image, bool addmetadata=false, int metadata=0);
-  static cv::Mat matFromQImage(QImage img);
+  cv::Mat matFromQImage(QImage img);
 
   ImageProcesser();
   virtual ~ImageProcesser() {}
@@ -45,6 +45,7 @@ public slots:
   void setIdentifyColorFrame(bool enable) { mIdentifyColorFrame = enable; }
   virtual void setDebugMode(bool enable) { mDebugMode = enable; }
   void setAllowAllSources(bool allow) { mAllowAllSources = allow; }
+  void setJpgegQualityLevel(int level) { mJpegQualityLevel = level; }
   void setLogTime(bool enable) { mLogTime = enable; }
   void triggerActionA();
   void triggerActionB();
@@ -82,6 +83,8 @@ protected:
   bool mIdentifyColorFrame = false;
   int mSkippedImages = 0;
   bool mLogTime = false;
+  int mJpegQualityLevel = 80;
+  int mImagesLogJpegSize = 10;
   QMap<quint32, qint64> mProcessingStartedTimes;
   QMap<quint32, qint64> mProcessingFinishedTimes;
   QElapsedTimer* mUptime;

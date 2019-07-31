@@ -67,8 +67,11 @@ QByteArrayPtr ImageProcesser::jpegFromQImage(
   if (!image.isNull()) {
     QBuffer qBuffer(retarray.data());
     qBuffer.open(QIODevice::WriteOnly);
-    image.save(&qBuffer, "JPG", 40);
-    fDebug << "JPEG size: " << retarray->size();
+    image.save(&qBuffer, "JPG", mJpegQualityLevel);
+    if (mImagesLogJpegSize > 0) {
+      mImagesLogJpegSize--;
+      fDebug << "JPEG image size: " << (retarray->size() * 8 / 1000) << " kbit";
+    }
   }
   if (addmetadata) {
     retarray->append(4, reinterpret_cast<unsigned char>(static_cast<quint8>(metadata)));
@@ -89,13 +92,16 @@ QByteArrayPtr ImageProcesser::jpegFromMat(
   std::vector<uchar> buffer;
   std::vector<int> param(2);
   param[0] = cv::IMWRITE_JPEG_QUALITY;
-  param[1] = 40; // 0-100
+  param[1] = mJpegQualityLevel; // 0-100
   cv::imencode(".jpg", mat, buffer, param);
   auto retarray = QByteArrayPtr(
         new QByteArray(
           reinterpret_cast<const char *>(buffer.data()),
           static_cast<int>(buffer.size())));
-  fDebug << "JPEG size: " << retarray->size();
+  if (mImagesLogJpegSize > 0) {
+    mImagesLogJpegSize--;
+    fDebug << "JPEG image size: " << (retarray->size() * 8 / 1000) << " kbit";
+  }
   if (addmetadata) {
     retarray->append(4, static_cast<char>(metadata));
   }

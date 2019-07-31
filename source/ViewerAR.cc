@@ -250,7 +250,7 @@ void ViewerAR::Run()
               gluOrtho2D(-1000, 1000, -1000, 1000);
               glLoadIdentity();
               glBegin(GL_POLYGON);
-              glColor3f(0, 1, 0);
+              glColor3f(1, 0, 1);
               glVertex2f(-1.0, 1.0);
               glVertex2f(1.0, 1.0);
               glVertex2f(1.0, 0.5);

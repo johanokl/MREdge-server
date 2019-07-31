@@ -91,6 +91,7 @@ void ViewerAR::Run()
 
   QElapsedTimer processingTimeTimer;
   processingTimeTimer.start();
+  qsrand(QTime::currentTime().msecsSinceStartOfDay());
 
 #ifndef DISABLE_IMAGE_OUTPUT
 #ifdef RENDER_WITH_PANGOLIN
@@ -231,8 +232,14 @@ void ViewerAR::Run()
             if (bRecompute) {
               pPlane->Recompute();
             }
-            arData = 2;
+            arData = 1;
             // Draw cube
+#ifndef DISABLE_IMAGE_OUTPUT
+            glPushMatrix();
+            pPlane->glTpw.Multiply();
+            draw3DObject(cubesize);
+            glPopMatrix();
+#endif
             if (mBenchmarking) {
 #ifndef DISABLE_IMAGE_OUTPUT
               glDisable(GL_DEPTH_TEST);
@@ -243,22 +250,15 @@ void ViewerAR::Run()
               gluOrtho2D(-1000, 1000, -1000, 1000);
               glLoadIdentity();
               glBegin(GL_POLYGON);
-              glColor3f(1, 0, 1);
-              glVertex2f(-1000, -1000);
-              glVertex2f(1000, -1000);
-              glVertex2f(1000, 1000);
-              glVertex2f(-1000, 1000);
+              glColor3f(0, 1, 0);
+              glVertex2f(-1.0, 1.0);
+              glVertex2f(1.0, 1.0);
+              glVertex2f(1.0, 0.5);
+              glVertex2f(-1.0, 0.5);
               glEnd();
               glEnable(GL_DEPTH_TEST);
               glMatrixMode(GL_MODELVIEW);
               glLoadIdentity();
-#endif
-            } else {
-#ifndef DISABLE_IMAGE_OUTPUT
-              glPushMatrix();
-              pPlane->glTpw.Multiply();
-              draw3DObject(cubesize);
-              glPopMatrix();
 #endif
             }
           }
@@ -277,11 +277,11 @@ void ViewerAR::Run()
       gluOrtho2D(-1000, 1000, -1000, 1000);
       glLoadIdentity();
       glBegin(GL_POLYGON);
-      glColor3f(1, 0, 1);
-      glVertex2f(-1000, -1000);
-      glVertex2f(1000, -1000);
-      glVertex2f(1000, 1000);
-      glVertex2f(-1000, 1000);
+      glColor3f(0, 1, 0);
+      glVertex2f(-1.0, 1.0);
+      glVertex2f(1.0, 1.0);
+      glVertex2f(1.0, 0.5);
+      glVertex2f(-1.0, 0.5);
       glEnd();
       glEnable(GL_DEPTH_TEST);
       glMatrixMode(GL_MODELVIEW);

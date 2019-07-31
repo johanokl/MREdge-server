@@ -217,7 +217,7 @@ void OrbSlamProcesser::process(qint32 session, quint32 frameid, cvMatPtr mat)
     if (mIdentifyColorFrame) {
       colorFrame = true;
       for (int i = 0; i < 10; i++) {
-        unsigned char * p = mat->ptr(20 * i,  20 * i);
+        unsigned char * p = mat->ptr(20 * i,  5 * i);
         if (p[0] != 252 || p[1] != 0 || p[2] != 252) {
            colorFrame = false;
            break;

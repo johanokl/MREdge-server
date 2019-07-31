@@ -65,7 +65,7 @@ System::System(ORBVocabulary *voc, const QJsonObject settingsFile, const eSensor
 
     //Create Drawers. These are used by the Viewer
     mpFrameDrawer = new FrameDrawer(mpMap);
-    mpMapDrawer = new MapDrawer(mpMap, settingsFile);
+    mpMapDrawer = new MapDrawer();
 
     //Initialize the Tracking thread
     //(it will live in the main thread of execution, the one that called this constructor)

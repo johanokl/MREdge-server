@@ -40,7 +40,7 @@ public:
   cvMatPtr latestFrame;
   bool reachedEndOfStream;
   bool running;
-  QElapsedTimer* timer;
+  QElapsedTimer *timer;
   QMap<int, int> frames_processed_per_time_slice;
   GMainLoop *mainLoop;
   GStreamerReceiver *parent;
@@ -180,9 +180,16 @@ GstFlowReturn frame_received_callback(GstAppSink *appsink, gpointer data)
   GstMapInfo map;
   gst_buffer_map(buffer, &map, GST_MAP_READ);
   // Convert gstreamer data to OpenCV Mat
-  auto currFrame = cvMatPtr(new cv::Mat(cv::Size(width, height), CV_8UC3,
-                                        reinterpret_cast<char *>(map.data),
-                                        cv::Mat::AUTO_STEP));
+  //quint8 *imagebuf = new quint8[width * height * 3];
+  //memcpy(imagebuf, map.data, width * height * 3);
+  //auto currFrame = cvMatPtr(new cv::Mat(cv::Size(width, height), CV_8UC3,
+  //                                      reinterpret_cast<char *>(imagebuf),
+  //                                      cv::Mat::AUTO_STEP));
+  auto currFrame = cvMatPtr(new cv::Mat(cv::Size(width, height), CV_8UC3));
+  memcpy(currFrame->data, map.data, width * height * 3);
+
+  gst_buffer_unmap(buffer, &map);
+  gst_sample_unref(sample);
   ctx->frames_sent++;
   if (ctx->timer == nullptr) {
     ctx->timer = new QElapsedTimer;
@@ -191,8 +198,6 @@ GstFlowReturn frame_received_callback(GstAppSink *appsink, gpointer data)
   auto time_slice = ctx->timer->elapsed() / 1000;
   ctx->frames_processed_per_time_slice[time_slice] += 1;
   ctx->parent->parent()->newMat(ctx->frames_sent, currFrame);
-  gst_buffer_unmap(buffer, &map);
-  gst_sample_unref(sample);
   return GST_FLOW_OK;
 }
 

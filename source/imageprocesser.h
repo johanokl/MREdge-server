@@ -37,11 +37,10 @@ public:
 
 signals:
   void sendFile(qint32 session, NetworkConnection::File file);
-  void sendQImage(qint32 session, quint32 frameid, QImagePtr image);
+  void sendQImage(qint32 session, quint32 frameid, QImage image);
 
 public slots:
   void setEmitJPEG(bool enable) { mEmitJPEG = enable; }
-  void setEmitMetadata(bool enable) { mEmitMetadata = enable; }
   void setEmitQImage(bool enable) { mEmitQImage = enable; }
   void setIdentifyColorFrame(bool enable) { mIdentifyColorFrame = enable; }
   virtual void setDebugMode(bool enable) { mDebugMode = enable; }
@@ -72,7 +71,7 @@ protected:
   quint32 mMatQueuePosition = 0;
   quint32 mFileQueuePosition = 0;
   quint32 mQImageQueuePosition = 0;
-  bool mEmitMetadata = false;
+  bool mBenchmarking = false;
   bool mEmitJPEG = false;
   bool mEmitQImage = false;
   bool mTriggeredA = false;

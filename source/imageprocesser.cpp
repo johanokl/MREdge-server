@@ -67,7 +67,8 @@ QByteArrayPtr ImageProcesser::jpegFromQImage(
   if (!image.isNull()) {
     QBuffer qBuffer(retarray.data());
     qBuffer.open(QIODevice::WriteOnly);
-    image.save(&qBuffer, "JPG", 85);
+    image.save(&qBuffer, "JPG", 40);
+    fDebug << "JPEG size: " << retarray->size();
   }
   if (addmetadata) {
     retarray->append(4, reinterpret_cast<unsigned char>(static_cast<quint8>(metadata)));
@@ -88,12 +89,13 @@ QByteArrayPtr ImageProcesser::jpegFromMat(
   std::vector<uchar> buffer;
   std::vector<int> param(2);
   param[0] = cv::IMWRITE_JPEG_QUALITY;
-  param[1] = 85; // 0-100
+  param[1] = 40; // 0-100
   cv::imencode(".jpg", mat, buffer, param);
   auto retarray = QByteArrayPtr(
         new QByteArray(
           reinterpret_cast<const char *>(buffer.data()),
           static_cast<int>(buffer.size())));
+  fDebug << "JPEG size: " << retarray->size();
   if (addmetadata) {
     retarray->append(4, static_cast<char>(metadata));
   }
@@ -166,16 +168,18 @@ void ImageProcesser::processFile(qint32 session, NetworkConnection::File file)
       file.type != NetworkConnection::FileType::IMAGE) {
     return;
   }
-  if (file.id <= mFileQueuePosition) {
-    mProcessQueueMutex.lock();
-    file = mFileProcessQueue;
-    mFileProcessQueue = NetworkConnection::File(NetworkConnection::FileType::NONE, 0, nullptr);
-    mMatProcessQueue = nullptr;
-    mProcessQueueMutex.unlock();
-  }
+  mProcessQueueMutex.lock();
+  file = mFileProcessQueue;
+  mFileProcessQueue = NetworkConnection::File(NetworkConnection::FileType::NONE, 0, nullptr);
+  mProcessQueueMutex.unlock();
   if (file.data.isNull()) {
-    fDebug << "Image " << file.id << " is null";
+    mSkippedImages++;
     return;
+  }
+  if (mSkippedImages > 0) {
+    fDebug << "Images arrived faster than could be processed. Skipped:"
+           << mSkippedImages;
+    mSkippedImages = 0;
   }
   process(mSession, file.id, cvMatPtr(new cv::Mat(matFromQImage(QImage::fromData(*file.data, "JPEG")))));
 }
@@ -193,16 +197,19 @@ void ImageProcesser::processQImage(qint32 session, quint32 frameid, QImage image
   if (!mAllowAllSources && session != mSession) {
     return;
   }
-  if (frameid <= mQImageQueuePosition) {
-    mProcessQueueMutex.lock();
-    image = mQImageProcessQueue;
-    frameid = mQImageQueuePosition;
-    mQImageProcessQueue = QImage();
-    mProcessQueueMutex.unlock();
-  }
+  mProcessQueueMutex.lock();
+  image = mQImageProcessQueue;
+  frameid = mQImageQueuePosition;
+  mQImageProcessQueue = QImage();
+  mProcessQueueMutex.unlock();
   if (image.isNull()) {
-    fDebug << "Image " << frameid << " is null";
+    mSkippedImages++;
     return;
+  }
+  if (mSkippedImages > 0) {
+    fDebug << "Images arrived faster than could be processed. Skipped:"
+           << mSkippedImages;
+    mSkippedImages = 0;
   }
   process(mSession, frameid, cvMatPtr(new cv::Mat(matFromQImage(image))));
 }
@@ -220,13 +227,11 @@ void ImageProcesser::processMat(qint32 session, quint32 frameid, cvMatPtr mat)
   if (!mAllowAllSources && session != mSession) {
     return;
   }
-  if (frameid <= mMatQueuePosition) {
-    mProcessQueueMutex.lock();
-    mat = mMatProcessQueue;
-    frameid = mMatQueuePosition;
-    mMatProcessQueue = nullptr;
-    mProcessQueueMutex.unlock();
-  }
+  mProcessQueueMutex.lock();
+  mat = mMatProcessQueue;
+  frameid = mMatQueuePosition;
+  mMatProcessQueue.clear();
+  mProcessQueueMutex.unlock();
   if (mat.isNull()) {
     mSkippedImages++;
     return;
@@ -262,7 +267,6 @@ const QMap<quint32, qint32> ImageProcesser::getProcessingTimes()
   }
   return retMap;
 }
-
 
 /**
  * @brief ImageProcesser::triggerActionA

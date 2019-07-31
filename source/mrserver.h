@@ -64,8 +64,7 @@ signals:
 
 public slots:
   void dataReceived(qint32 session, NetworkConnection::File file);
-  void displayImagePtr(qint32 session, quint32 frameid, QImagePtr image);
-  void displayImage(qint32 session, QImage image);
+  void displayImage(qint32 session, quint32 frameid, QImage image);
   void newSession(qint32 session, QString host, quint16 port);
   void removeSession(qint32 session);
   void videoReceiverReady(qint32 session, VideoStreamer::Format format, quint16 port);
@@ -74,11 +73,12 @@ public slots:
   void setLogTime(bool enable) { mLogTime = enable; }
   void setIdentifyColorFrame(bool enable) { mIdentifyColorFrame = enable; }
   void startServer(quint16 tcpPort, quint16 udpPort);
-  void loadVoc(QString path);
+  void loadVoc(QString path, int poolSize);
   void setMixedRealityFramework(CV_FRAMEWORKS framework) {
     mCvFramework = framework; }
 
 private:
+  ORB_SLAM2::ORBVocabulary * getVocabulary();
   CV_FRAMEWORKS mCvFramework;
   TcpConnection *mTcpCon;
   UdpConnection *mUdpCon;
@@ -86,7 +86,8 @@ private:
   QList<MockClient *> mMockClients;
   QMap<qint32, Session *> sessions;
   QMutex mSessionsListmutex;
-  ORB_SLAM2::ORBVocabulary *mpVocabulary;
+  QMap<ORB_SLAM2::ORBVocabulary *, bool> mVocabularyPool;
+  QString mVocabularyPath;
   QMap<qint32, QLabel *> mWindows;
   bool mDisplayResult;
   bool mBenchmarking;

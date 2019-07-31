@@ -22,9 +22,10 @@ namespace MREdge {
  * @brief EchoImage::EchoImage
  * @param session
  */
-EchoImage::EchoImage(qint32 session) {
+EchoImage::EchoImage(qint32 session, bool benchmarking) {
   mRunning = true;
   mSession = session;
+  mBenchmarking = benchmarking;
 }
 
 /**
@@ -70,14 +71,13 @@ void EchoImage::process(qint32 session, quint32 frameid, cvMatPtr image)
   if (mEmitJPEG) {
     cvtColor(*image, dstImage, cv::COLOR_BGR2RGB);
     emit sendFile(mSession, NetworkConnection::File(
-                    (mEmitMetadata ?
+                    (mBenchmarking ?
                        NetworkConnection::FileType::IMAGE_WITH_METADATA :
                        NetworkConnection::FileType::IMAGE),
-                    frameid, jpegFromMat(dstImage, mEmitMetadata, metadata)));
+                    frameid, jpegFromMat(dstImage, mBenchmarking, metadata)));
   }
   if (mEmitQImage) {
-    emit sendQImage(mSession, frameid,
-                    QImagePtr(new QImage(qImageFromMat(dstImage))));
+    emit sendQImage(mSession, frameid, qImageFromMat(dstImage));
   }
 }
 

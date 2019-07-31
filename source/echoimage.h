@@ -29,7 +29,7 @@ class EchoImage : public ImageProcesser {
   Q_OBJECT
 
 public:
-  EchoImage(qint32 session);
+  EchoImage(qint32 session, bool benchmarking);
   virtual ~EchoImage() override;
   void setConfig(QJsonObject) override {}
   void setCalibrateMode(bool) override {}

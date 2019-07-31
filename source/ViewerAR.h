@@ -61,50 +61,25 @@ public:
   static QStringList AR_OBJECT_TYPES;
 
   ViewerAR(int width, int height, const bool benchmarking, const bool logTime);
-
-  void setFPS(const double fps){
-    mFPS = fps;
-    mT = 1e3/fps;
-  }
-
-  void setSLAM(ORB_SLAM2::System* pSystem){
-    mpSystem = pSystem;
-  }
-
-  // Main thread function.
+  void setFPS(const double fps) { mFPS = fps; mT = 1e3/fps; }
+  void setSLAM(ORB_SLAM2::System* pSystem) { mpSystem = pSystem; }
   void Run();
   void Stop();
-
-  void setCameraCalibration(const float &fx_, const float &fy_, const float &cx_, const float &cy_) {
-    fx = static_cast<double>(fx_);
-    fy = static_cast<double>(fy_);
-    cx = static_cast<double>(cx_);
-    cy = static_cast<double>(cy_);
-  }
-
   void setImagePose(
       quint32 frameid, bool forcecolor, const cv::Mat &im, const cv::Mat &Tcw, const int &status,
       const std::vector<cv::KeyPoint> &vKeys, const std::vector<ORB_SLAM2::MapPoint*> &vMPs);
-
   void getImagePose(
       quint32 &frameid, cv::Mat &im, cv::Mat &Tcw, int &status,
       std::vector<cv::KeyPoint> &vKeys,  std::vector<ORB_SLAM2::MapPoint*> &vMPs);
-
   void set3DObjectType(QString object);
-  void add3DObject() {
-    mRemove3dObject = true;
-    mAdd3dObject = true;
-  }
-
-  void remove3DObject() {
-    mRemove3dObject = true;
-  }
-
+  void add3DObject() { mRemove3dObject = true; mAdd3dObject = true; }
+  void remove3DObject() { mRemove3dObject = true; }
+  void setCameraCalibration(const float &fx_, const float &fy_, const float &cx_, const float &cy_);
 
 signals:
   // Extend second parameter from int to larger data structure
   // if needed to store larger.
-  void newImageReady(quint32 frameid, QImagePtr image, int metadata);
+  void newImageReady(quint32 frameid, QImage image, int metadata);
 
 private:
   void drawStatus(const int &status, const bool &bLocMode, cv::Mat &im);

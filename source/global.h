@@ -19,8 +19,6 @@ namespace MREdge {
 
 typedef QSharedPointer<QByteArray> QByteArrayPtr;
 typedef QSharedPointer<cv::Mat> cvMatPtr;
-typedef QSharedPointer<QImage> QImagePtr;
-
 
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 #define fDebug qDebug().noquote() << __FILENAME__ << ":"

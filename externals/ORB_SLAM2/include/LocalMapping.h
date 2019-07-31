@@ -28,8 +28,7 @@
 #include "KeyFrameDatabase.h"
 
 #include <mutex>
-#include <QMutex>
-#include <QWaitCondition>
+
 
 namespace ORB_SLAM2
 {
@@ -69,17 +68,13 @@ public:
     bool isFinished();
 
     int KeyframesInQueue(){
-#ifdef USE_QMUTEX_LOOP
-        unique_lock<QMutex> lock(mMutexNewKFs);
-#else
         unique_lock<std::mutex> lock(mMutexNewKFs);
-#endif
         return mlNewKeyFrames.size();
     }
 
 protected:
 
-    bool CheckNewKeyFrames(bool newFrame=false);
+    bool CheckNewKeyFrames();
     void ProcessNewKeyFrame();
     void CreateNewMapPoints();
 
@@ -115,12 +110,7 @@ protected:
 
     std::list<MapPoint*> mlpRecentAddedMapPoints;
 
-#ifdef USE_QMUTEX_LOOP
-    QMutex mMutexNewKFs;
-    QWaitCondition mQWaitCondition;
-#else
     std::mutex mMutexNewKFs;
-#endif
 
     bool mbAbortBA;
 

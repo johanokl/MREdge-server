@@ -105,7 +105,6 @@ void ViewerAR::Run()
   d_image.SetBounds(0, 1.0f, 0, 1.0f, (float)mWidth / mHeight); // -?
   d_image.SetLock(pangolin::LockLeft, pangolin::LockTop);
 
-
   pangolin::GlTexture color_buffer(mWidth, mHeight);
   pangolin::GlRenderBuffer depth_buffer(mWidth, mHeight);
   pangolin::GlFramebuffer fbo_buffer(color_buffer, depth_buffer);
@@ -290,12 +289,10 @@ void ViewerAR::Run()
     }
 
 #ifdef DISABLE_IMAGE_OUTPUT
-    QImagePtr outImage(new QImage());
+    QImage outImage(new QImage());
 #else
-    QImagePtr outImage(new QImage(mWidth, mHeight, QImage::Format::Format_RGB888));
-    uchar* outimagePtr = outImage->bits();
-#define RENDER_WITH_OSMESA TRUE
-
+    QImage outImage(mWidth, mHeight, QImage::Format::Format_RGB888);
+    uchar* outimagePtr = outImage.bits();
 
 #ifdef RENDER_WITH_PANGOLIN
 #ifdef RENDER_PANGOLIN_HEADLESS
@@ -303,6 +300,7 @@ void ViewerAR::Run()
     glReadBuffer(GL_BACK);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glReadPixels(0, 0, mWidth, mHeight, GL_RGB, GL_UNSIGNED_BYTE, outimagePtr);
+    outImage = outImage.mirrored(false, true);
 #else
     outimagePtr = nullptr;
 #endif
@@ -364,6 +362,20 @@ void ViewerAR::Run()
 }
 
 /**
+ * @brief ViewerAR::Stop
+ * Stop the thread.
+ */
+void ViewerAR::Stop()
+{
+  mRunning = false;
+  mMutexPoseImage.lock();
+#ifdef USE_QMUTEX_AR
+  mQWaitCondition.wakeAll();
+#endif
+  mMutexPoseImage.unlock();
+}
+
+/**
  * @brief ViewerAR::setImagePose
  * @param im
  * @param Tcw
@@ -380,25 +392,11 @@ void ViewerAR::setImagePose(
   mPoseReady = true;
   mFrameId = id;
   mForceColor = forcecolor;
-  mImage = im.clone();
-  mTcw = Tcw.clone();
+  mImage = im;//.clone();
+  mTcw = Tcw;//.clone();
   mStatus = status;
   mvKeys = vKeys;
   mvMPs = vMPs;
-#ifdef USE_QMUTEX_AR
-  mQWaitCondition.wakeAll();
-#endif
-  mMutexPoseImage.unlock();
-}
-
-/**
- * @brief ViewerAR::Stop
- * Stop the thread.
- */
-void ViewerAR::Stop()
-{
-  mRunning = false;
-  mMutexPoseImage.lock();
 #ifdef USE_QMUTEX_AR
   mQWaitCondition.wakeAll();
 #endif
@@ -425,8 +423,8 @@ void ViewerAR::getImagePose(
 #endif
   mPoseReady = false;
   frameid = mFrameId;
-  im = mImage.clone();
-  Tcw = mTcw.clone();
+  im = mImage;
+  Tcw = mTcw;
   status = mStatus;
   vKeys = mvKeys;
   vMPs = mvMPs;
@@ -624,6 +622,21 @@ void ViewerAR::drawTrackedPoints(const std::vector<cv::KeyPoint> &vKeys, const s
   mTotalTrackedPoints += mTotalTrackedPointsThisFrame;
   mNumFramesDrawn += 1;
 }
+
+/**
+ * @brief ViewerAR::setCameraCalibration
+ * @param fx_
+ * @param fy_
+ * @param cx_
+ * @param cy_
+ */
+void ViewerAR::setCameraCalibration(const float &fx_, const float &fy_, const float &cx_, const float &cy_) {
+  fx = static_cast<double>(fx_);
+  fy = static_cast<double>(fy_);
+  cx = static_cast<double>(cx_);
+  cy = static_cast<double>(cy_);
+}
+
 
 /**
  * @brief ViewerAR::detectPlane

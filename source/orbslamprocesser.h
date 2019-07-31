@@ -51,6 +51,8 @@ public:
                             bool benchmarking, bool logTimes, bool loopClosing);
   ~OrbSlamProcesser() override;
   void setDebugMode(bool enable) override;
+  ORB_SLAM2::ORBVocabulary * getVocabulary() { return mVocabulary; }
+
 
 public slots:
   void setConfig(QJsonObject calibration) override;
@@ -72,7 +74,6 @@ private:
   QSize mImgSize;
   ORB_SLAM2::ORBVocabulary *mVocabulary;
   ORB_SLAM2::System *mSLAM;
-  bool mBenchmarking;
   bool mLogTime;
   cv::Mat mK;
   cv::Mat mDistCoef;

@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
   qRegisterMetaType<QList<QVector3D>>("QList<QVector3D>");
   qRegisterMetaType<QMatrix4x4>("QMatrix4x4");
   qRegisterMetaType<cvMatPtr>("cvMatPtr");
-  qRegisterMetaType<QImagePtr>("QImagePtr");
+  qRegisterMetaType<QImage>("QImage");
   qRegisterMetaType<NetworkConnection::File>("File");
   qRegisterMetaType<VideoStreamer::Format>("Format");
 
@@ -134,6 +134,14 @@ int main(int argc, char *argv[])
         "Disable loop closing in ORB-SLAM2.");
   parser.addOption(disableLoopClosingOption);
 
+  QCommandLineOption vocPoolSizeOption(
+        QStringList() << "p" << "pool",
+        "Set the <size> [0, 1, 2, ..] of the pool of vocabulary files at system startup. " \
+        "Default is 1.",
+        "size");
+  parser.addOption(vocPoolSizeOption);
+
+
   parser.process(app);
 
   if (parser.isSet(tcpOption)) {
@@ -145,6 +153,11 @@ int main(int argc, char *argv[])
   QString vocPath = "";
   if (parser.isSet(vocOption)) {
     vocPath = parser.value(vocOption);
+  }
+
+  int vocPoolSize = 1;
+  if (parser.isSet(vocPoolSizeOption)) {
+    vocPoolSize = parser.value(vocPoolSizeOption).toInt();
   }
 
   bool benchmarkingOptionEnabled = parser.isSet(benchmarkingOption);
@@ -171,10 +184,10 @@ int main(int argc, char *argv[])
     myServer.setMixedRealityFramework(MRServer::ECHOIMAGE);
   } else if (parser.isSet(disableLoopClosingOption)) {
     myServer.setMixedRealityFramework(MRServer::ORB_SLAM2_NO_LC);
-    myServer.loadVoc(vocPath);
+    myServer.loadVoc(vocPath, vocPoolSize);
   } else {
     myServer.setMixedRealityFramework(MRServer::ORB_SLAM2);
-    myServer.loadVoc(vocPath);
+    myServer.loadVoc(vocPath, vocPoolSize);
   }
 
   myServer.startServer(tcpPort, udpPort);

@@ -68,8 +68,7 @@ void CannyFilter::process(qint32 session, quint32 frameid, cvMatPtr image)
   }
   if (mEmitQImage) {
     fDebug << "Emitting QImage";
-    emit sendQImage(mSession, frameid,
-                    QImagePtr(new QImage(qImageFromMat(dst))));
+    emit sendQImage(mSession, frameid, qImageFromMat(dst));
   }
 }
 

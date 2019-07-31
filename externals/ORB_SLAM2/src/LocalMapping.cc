@@ -22,9 +22,6 @@
 #include "LoopClosing.h"
 #include "ORBmatcher.h"
 #include "Optimizer.h"
-#ifdef USE_QMUTEX_LOC_MAP
-#include "source/global.h"
-#endif
 
 #include<mutex>
 
@@ -58,7 +55,7 @@ void LocalMapping::Run()
         SetAcceptKeyFrames(false);
 
         // Check if there are keyframes in the queue
-        if(CheckNewKeyFrames(true))
+        if(CheckNewKeyFrames())
         {
             // BoW conversion and insertion in Map
             ProcessNewKeyFrame();
@@ -116,43 +113,22 @@ void LocalMapping::Run()
 
 void LocalMapping::InsertKeyFrame(KeyFrame *pKF)
 {
-#ifdef USE_QMUTEX_LOC_MAP
-  unique_lock<QMutex> lock(mMutexNewKFs);
-#else
     unique_lock<mutex> lock(mMutexNewKFs);
-#endif
     mlNewKeyFrames.push_back(pKF);
     mbAbortBA=true;
-#ifdef USE_QMUTEX_LOC_MAP
-    mQWaitCondition.wakeAll();
-#endif
 }
 
 
-bool LocalMapping::CheckNewKeyFrames(bool newFrame)
+bool LocalMapping::CheckNewKeyFrames()
 {
-  Q_UNUSED(newFrame);
-#ifdef USE_QMUTEX_LOC_MAP
-    unique_lock<QMutex> lock(mMutexNewKFs);
-    if (newFrame && mlNewKeyFrames.empty()) {
-        mQWaitCondition.wait(&mMutexNewKFs);
-        return true;
-    }
-#else
     unique_lock<mutex> lock(mMutexNewKFs);
-#endif
-
     return(!mlNewKeyFrames.empty());
 }
 
 void LocalMapping::ProcessNewKeyFrame()
 {
     {
-#ifdef USE_QMUTEX_LOC_MAP
-        unique_lock<QMutex> lock(mMutexNewKFs);
-#else
         unique_lock<mutex> lock(mMutexNewKFs);
-#endif
         mpCurrentKeyFrame = mlNewKeyFrames.front();
         mlNewKeyFrames.pop_front();
     }
@@ -182,7 +158,7 @@ void LocalMapping::ProcessNewKeyFrame()
                 }
             }
         }
-    }    
+    }
 
     // Update links in the Covisibility Graph
     mpCurrentKeyFrame->UpdateConnections();
@@ -363,7 +339,7 @@ void LocalMapping::CreateNewMapPoints()
             }
             else if(bStereo1 && cosParallaxStereo1<cosParallaxStereo2)
             {
-                x3D = mpCurrentKeyFrame->UnprojectStereo(idx1);                
+                x3D = mpCurrentKeyFrame->UnprojectStereo(idx1);
             }
             else if(bStereo2 && cosParallaxStereo2<cosParallaxStereo1)
             {
@@ -457,7 +433,7 @@ void LocalMapping::CreateNewMapPoints()
             // Triangulation is succesfull
             MapPoint* pMP = new MapPoint(x3D,mpCurrentKeyFrame,mpMap);
 
-            pMP->AddObservation(mpCurrentKeyFrame,idx1);            
+            pMP->AddObservation(mpCurrentKeyFrame,idx1);
             pMP->AddObservation(pKF2,idx2);
 
             mpCurrentKeyFrame->AddMapPoint(pMP,idx1);
@@ -580,11 +556,7 @@ void LocalMapping::RequestStop()
 {
     unique_lock<mutex> lock(mMutexStop);
     mbStopRequested = true;
-#ifdef USE_QMUTEX_LOC_MAP
-    unique_lock<QMutex> lock2(mMutexNewKFs);
-#else
     unique_lock<mutex> lock2(mMutexNewKFs);
-#endif
     mbAbortBA = true;
 }
 
@@ -716,7 +688,7 @@ void LocalMapping::KeyFrameCulling()
                     }
                 }
             }
-        }  
+        }
 
         if(nRedundantObservations>0.9*nMPs)
             pKF->SetBadFlag();
@@ -774,7 +746,7 @@ bool LocalMapping::CheckFinish()
 void LocalMapping::SetFinish()
 {
     unique_lock<mutex> lock(mMutexFinish);
-    mbFinished = true;    
+    mbFinished = true;
     unique_lock<mutex> lock2(mMutexStop);
     mbStopped = true;
 }

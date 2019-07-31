@@ -152,17 +152,17 @@ void OrbSlamProcesser::setConfig(QJsonObject calibration)
     mViewerARthread = new std::thread(&ViewerAR::Run, mViewerAR);
 
     QObject::connect(mViewerAR, &ViewerAR::newImageReady,
-                     [=](quint32 frameid, QImagePtr img, int metadata) {
+                     [=](quint32 frameid, QImage img, int metadata) {
       if (mRunning && mLogTime) {
         mProcessingFinishedTimes.insert(frameid, mUptime->nsecsElapsed());
       }
       if (mRunning && mEmitJPEG) {
         emit sendFile(
               mSession, NetworkConnection::File(
-                (mEmitMetadata ?
+                (mBenchmarking ?
                    NetworkConnection::FileType::IMAGE_WITH_METADATA :
                    NetworkConnection::FileType::IMAGE),
-                frameid, jpegFromQImage(*img, mEmitMetadata, metadata)));
+                frameid, jpegFromQImage(img, mBenchmarking, metadata)));
       }
       if (mRunning && mEmitQImage) {
         emit sendQImage(mSession, frameid, img);
@@ -210,7 +210,7 @@ void OrbSlamProcesser::process(qint32 session, quint32 frameid, cvMatPtr mat)
                       frameid, jpegFromMat(dstImage)));
     }
     if (mEmitQImage) {
-      emit sendQImage(mSession, frameid, QImagePtr(new QImage(qImageFromMat(outimg))));
+      emit sendQImage(mSession, frameid, qImageFromMat(outimg));
     }
   } else if (mSLAM) {
     bool colorFrame = false;
@@ -227,11 +227,11 @@ void OrbSlamProcesser::process(qint32 session, quint32 frameid, cvMatPtr mat)
         fDebug << "Color frame found";
       }
     }
-    cv::Mat Tcw = mSLAM->TrackMonocular(*mat, frameid);
+    //emit sendQImage(mSession, frameid, qImageFromMat(mat->clone()));
+    cv::Mat Tcw = mSLAM->TrackMonocular(mat->clone(), static_cast<double>(frameid) / 30);
     int state = mSLAM->GetTrackingState();
     vector<ORB_SLAM2::MapPoint*> vMPs = mSLAM->GetTrackedMapPoints();
     vector<cv::KeyPoint> vKeys = mSLAM->GetTrackedKeyPointsUn();
-    mViewerAR->setImagePose(frameid, colorFrame, *mat, Tcw, state, vKeys, vMPs);
     if (mTriggeredA) {
       // Add a 3D object.
       mViewerAR->add3DObject();
@@ -247,6 +247,7 @@ void OrbSlamProcesser::process(qint32 session, quint32 frameid, cvMatPtr mat)
       mSLAM->Reset();
       mTriggeredC = false;
     }
+    mViewerAR->setImagePose(frameid, colorFrame, mat->clone(), Tcw, state, vKeys, vMPs);
   }
 }
 

@@ -82,7 +82,6 @@ MRServer::MRServer()
   mCvFramework = ORB_SLAM2;
   mUptime = new QElapsedTimer();
   mUptime->start();
-  mpVocabulary = nullptr;
 
   qDebug() << " +------------------------------------";
   qDebug() << " |               MREdge";
@@ -122,36 +121,44 @@ MRServer::~MRServer()
 #ifdef ENABLE_WIDGET_SUPPORT
   qDeleteAll(mWindows);
 #endif
-  delete mpVocabulary;
+  QMutableMapIterator<ORB_SLAM2::ORBVocabulary *, bool> vocPoolIt(mVocabularyPool);
+  while (vocPoolIt.hasNext()) {
+    vocPoolIt.next();
+    delete vocPoolIt.key();
+  }
 }
 
 /**
  * @brief MRServer::loadVoc
  * @param path
  */
-void MRServer::loadVoc(QString path)
+void MRServer::loadVoc(QString path, int poolSize)
 {
   fDebug << "Loading ORB-SLAM2's BoW vocabulary...";
-  mpVocabulary = new ORB_SLAM2::ORBVocabulary();
-  QFileInfo userVocabularyFile(path);
-  QFileInfo textVocabularyFile("ORBvoc.txt");
-  QFileInfo homeDirTextVocabularyFile(QDir::homePath() + QDir::separator() + "ORBvoc.txt");
-  if (userVocabularyFile.exists() && !path.isNull()) {
-    fDebug << "Loading text file from" << userVocabularyFile.absoluteFilePath();
-    mpVocabulary->loadFromTextFile(userVocabularyFile.absoluteFilePath().toStdString());
-  } else if (textVocabularyFile.exists()) {
-    fDebug << "Loading text file from" << textVocabularyFile.absoluteFilePath();
-    mpVocabulary->loadFromTextFile(textVocabularyFile.absoluteFilePath().toStdString());
-  } else if (homeDirTextVocabularyFile.exists()) {
-    fDebug << "Loading text file from" << homeDirTextVocabularyFile.absoluteFilePath();
-    mpVocabulary->loadFromTextFile(homeDirTextVocabularyFile.absoluteFilePath().toStdString());
-  }
-  if (mpVocabulary->empty()) {
-    fDebug << "Error: Could not load vocabulary.";
-    fDebug << "Place ORBvoc.txt in executable's directory.";
-    fDebug << "ORBvoc.txt can be found in /externals/ORB_SLAM2/Vocabulary/ORBvoc.txt.tar.gz";
-  } else {
-    fDebug << "Vocabulary loaded.";
+  mVocabularyPath = path;
+  for (int i = 0; i < poolSize; i++) {
+    ORB_SLAM2::ORBVocabulary* mpVocabulary = new ORB_SLAM2::ORBVocabulary();
+    mVocabularyPool.insert(mpVocabulary, false);
+    QFileInfo userVocabularyFile(path);
+    QFileInfo textVocabularyFile("ORBvoc.txt");
+    QFileInfo homeDirTextVocabularyFile(QDir::homePath() + QDir::separator() + "ORBvoc.txt");
+    if (userVocabularyFile.exists() && !path.isNull()) {
+      fDebug << "Loading text file from" << userVocabularyFile.absoluteFilePath();
+      mpVocabulary->loadFromTextFile(userVocabularyFile.absoluteFilePath().toStdString());
+    } else if (textVocabularyFile.exists()) {
+      fDebug << "Loading text file from" << textVocabularyFile.absoluteFilePath();
+      mpVocabulary->loadFromTextFile(textVocabularyFile.absoluteFilePath().toStdString());
+    } else if (homeDirTextVocabularyFile.exists()) {
+      fDebug << "Loading text file from" << homeDirTextVocabularyFile.absoluteFilePath();
+      mpVocabulary->loadFromTextFile(homeDirTextVocabularyFile.absoluteFilePath().toStdString());
+    }
+    if (mpVocabulary->empty()) {
+      fDebug << "Error: Could not load vocabulary.";
+      fDebug << "Place ORBvoc.txt in executable's directory.";
+      fDebug << "ORBvoc.txt can be found in /externals/ORB_SLAM2/Vocabulary/ORBvoc.txt.tar.gz";
+    } else {
+      fDebug << "Vocabulary object added loaded to the pool.";
+    }
   }
 }
 
@@ -216,10 +223,11 @@ void MRServer::addFilewriter(QString path)
  *
  * Display the result image in a Qt GUI window.
  */
-void MRServer::displayImage(qint32 session, QImage image)
+void MRServer::displayImage(qint32 session, quint32 frameid, QImage image)
 {
-  Q_UNUSED(image);
   Q_UNUSED(session);
+  Q_UNUSED(frameid);
+  Q_UNUSED(image);
 #ifdef ENABLE_WIDGET_SUPPORT
   if (mWindows.contains(session)) {
     bool resizeToFit = false;
@@ -234,20 +242,6 @@ void MRServer::displayImage(qint32 session, QImage image)
     }
     window->setPixmap(pixmap);
   }
-#endif
-}
-
-/**
- * @brief MRServer::displayImage
- * @param image Image to be displayed.
- * Wrapper for displayImage(qint32 session, QImage image)
- */
-void MRServer::displayImagePtr(qint32 session, quint32 frameid, QImagePtr image) {
-  Q_UNUSED(image);
-  Q_UNUSED(frameid);
-  Q_UNUSED(session);
-#ifdef ENABLE_WIDGET_SUPPORT
-  displayImage(session, *image);
 #endif
 }
 
@@ -482,6 +476,33 @@ void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
   }
 }
 
+
+/**
+ * @brief MRServer::getVocabulary
+ * @return Vocabulary object.
+ */
+ORB_SLAM2::ORBVocabulary * MRServer::getVocabulary()
+{
+  ORB_SLAM2::ORBVocabulary * retObject = nullptr;
+  mSessionsListmutex.lock();
+  QMapIterator<ORB_SLAM2::ORBVocabulary *, bool> vocPoolIt(mVocabularyPool);
+  while (vocPoolIt.hasNext()) {
+    vocPoolIt.next();
+    if (vocPoolIt.value() == false) {
+      retObject = vocPoolIt.key();
+      mVocabularyPool[vocPoolIt.key()] = true;
+      break;
+    }
+  }
+  mSessionsListmutex.unlock();
+  if (retObject == nullptr) {
+    loadVoc(mVocabularyPath, 1);
+    retObject = getVocabulary();
+  }
+  return retObject;
+}
+
+
 /**
  * @brief MRServer::newSession
  * @param sessionId The new client's session id.
@@ -512,13 +533,13 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
     imageprocesser = new CannyFilter(sessionId);
     break;
   case ECHOIMAGE:
-    imageprocesser = new EchoImage(sessionId);
+    imageprocesser = new EchoImage(sessionId, mBenchmarking);
     break;
   case ORB_SLAM2:
-    imageprocesser = new OrbSlamProcesser(sessionId, mpVocabulary, mBenchmarking, mLogTime, true);
+    imageprocesser = new OrbSlamProcesser(sessionId, getVocabulary(), mBenchmarking, mLogTime, true);
     break;
   case ORB_SLAM2_NO_LC:
-    imageprocesser = new OrbSlamProcesser(sessionId, mpVocabulary, mBenchmarking, mLogTime, false);
+    imageprocesser = new OrbSlamProcesser(sessionId, getVocabulary(), mBenchmarking, mLogTime, false);
     break;
   default:
     return;
@@ -533,8 +554,6 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
   imageprocesser->setIdentifyColorFrame(mIdentifyColorFrame);
   imageprocesser->moveToThread(new QThread(this));
   imageprocesser->thread()->start();
-  session->imageprocesser->setEmitMetadata(true);
-
 
   auto videotransmitter = new VideoTransmitter(sessionId, host);
   videotransmitter->setLogTime(mLogTime, mUptime);
@@ -622,11 +641,10 @@ void MRServer::newSession(qint32 sessionId, QString host, quint16 port)
   // GUI window output
   if (mDisplayResult) {
     QObject::connect(imageprocesser, &ImageProcesser::sendQImage,
-                     this, &MRServer::displayImagePtr);
+                     this, &MRServer::displayImage);
     QObject::connect(videoreceiver, &VideoReceiver::matReady,
                      [=](qint32 session, quint32 frameid, cvMatPtr image) {
-      Q_UNUSED(frameid);
-      this->displayImage(session + 1000, ImageProcesser::qImageFromMat(*image));
+      this->displayImage(session + 1000, frameid, ImageProcesser::qImageFromMat(*image));
     });
   }
   QJsonObject retObject;

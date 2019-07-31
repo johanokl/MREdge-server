@@ -197,17 +197,18 @@ void VideoTransmitter::init()
  * @param session Session id.
  * @param image New video frame to add to the streamer's buffer.
  */
-void VideoTransmitter::addQImageToProcessQueue(qint32 session, quint32 frameid, QImagePtr image)
+void VideoTransmitter::addQImageToProcessQueue(qint32 session, quint32 frameid, QImage image)
 {
   if (!mStreamContext || !mStreamContext->initialized || session != mSession) {
     return;
   }
   Q_UNUSED(frameid);
   mMutex.lock();
-  if (!mImage.isNull()) {
+  if (mValidImage) {
     fDebug << "addQImageToProcessQueue: Buffer not empty. Replace image.";
   }
   mImage = image;
+  mValidImage = true;
   mMutex.unlock();
 }
 
@@ -219,21 +220,23 @@ void VideoTransmitter::addQImageToProcessQueue(qint32 session, quint32 frameid, 
  * Sends the image to GStreamer's inbox, to be encoded and transmitted using
  * the configured streaming format.
  */
-void VideoTransmitter::processQImage(qint32 session, quint32 frameid, QImagePtr image)
+void VideoTransmitter::processQImage(qint32 session, quint32 frameid, QImage image)
 {
   if (!mStreamContext || !mStreamContext->initialized || session != mSession) {
     return;
   }
   Q_UNUSED(frameid);
+  bool isValid = false;
   mMutex.lock();
   image = mImage;
-  mImage.clear();
+  isValid = mValidImage;
+  mValidImage = false;
   mMutex.unlock();
-  if (image.isNull()) {
+  if (!isValid) {
     fDebug << "Frame skipped. Inflow faster than they could be processed.";
     return;
   }
-  if (mStreamContext->videoSize != image->size()) {
+  if (mStreamContext->videoSize != image.size()) {
     fDebug << QString("Image is wrong size. Should be (%1, %2)")
               .arg(mStreamContext->videoSize.width())
               .arg(mStreamContext->videoSize.height());
@@ -243,8 +246,8 @@ void VideoTransmitter::processQImage(qint32 session, quint32 frameid, QImagePtr 
     mTimer = new QElapsedTimer;
     mTimer->start();
   }
-  auto buffer = gst_buffer_new_and_alloc(static_cast<gsize>(image->byteCount()));
-  gst_buffer_fill(buffer, 0, image->constBits(), static_cast<gsize>(image->byteCount()));
+  auto buffer = gst_buffer_new_and_alloc(static_cast<gsize>(image.byteCount()));
+  gst_buffer_fill(buffer, 0, image.constBits(), static_cast<gsize>(image.byteCount()));
   gst_buffer_set_flags(buffer, GST_BUFFER_FLAG_LIVE);
   buffer->pts = static_cast<GstClockTime>(mTimer->nsecsElapsed());
   auto result = gst_app_src_push_buffer(mStreamContext->appsrc, buffer);
@@ -254,9 +257,7 @@ void VideoTransmitter::processQImage(qint32 session, quint32 frameid, QImagePtr 
   if (mLogTime && mUptime) {
     mFramesProcessedNsec.insert(frameid, mUptime->nsecsElapsed());
   }
-  if (result == GST_FLOW_OK) {
-    //fDebug << "Image" << frameid << "successfully pushed.";
-  } else {
+  if (result != GST_FLOW_OK) {
     fDebug << "Failure when pushing image" << frameid;
   }
 }

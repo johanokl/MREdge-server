@@ -37,8 +37,8 @@ public:
   QMap<quint32, qint64> getProcessingTimes() const;
 
 public slots:
-  void addQImageToProcessQueue(qint32 , quint32, QImagePtr);
-  void processQImage(qint32, quint32, QImagePtr);
+  void addQImageToProcessQueue(qint32 , quint32, QImage);
+  void processQImage(qint32, quint32, QImage);
   void writeLog();
   void setLogTime(bool enable, QElapsedTimer* timer=nullptr) {
     mLogTime = enable; mUptime=timer; }
@@ -55,7 +55,8 @@ private:
   QString mDestHost;
   qint32 mSession;
   quint16 mDestPort;
-  QImagePtr mImage;
+  QImage mImage;
+  bool mValidImage;
   QMutex mMutex;
   Format mFormat;
   QSize mImageSize;

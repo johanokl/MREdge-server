@@ -704,6 +704,7 @@ void MRServer::removeSession(qint32 sessionId)
     qint64 timeFirst = std::numeric_limits<qint64>::max();
     qint64 timeLast = std::numeric_limits<qint64>::min();
     QMapIterator<quint32, qint64> arrivedIt(videoarrivedtimes);
+    qint64 lastArrivedTime = 0;
     while (arrivedIt.hasNext()) {
       arrivedIt.next();
       if (imagesprocessortimes.contains(arrivedIt.key())) {
@@ -732,6 +733,11 @@ void MRServer::removeSession(qint32 sessionId)
                   .arg(processingtime, -4)
                   .arg(mrtime, -4);
       }
+      fDebug << QString("Frame arrival time: %1 Diff: %2 Dropped: %3")
+                .arg(qRound(((double) (arrivedIt.value())) / (1000 * 1000)))
+                .arg(qRound(((double) (arrivedIt.value() - lastArrivedTime)) / (1000 * 1000)))
+                .arg(imagesprocessortimes.contains(arrivedIt.key()) ? "No" : "Yes");
+      lastArrivedTime = arrivedIt.value();
     }
     fDebug << "---------------------------------------";
     fDebug << "Frames arrived:      " << videoarrivedtimes.size();

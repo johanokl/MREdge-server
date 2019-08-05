@@ -22,7 +22,7 @@
 #include <QMetaEnum>
 #include <opencv2/opencv.hpp>
 
-#define WRITE_LOG_TRIGGER_TIME 58
+#define WRITE_LOG_TRIGGER_TIME 63
 
 namespace MREdge {
 

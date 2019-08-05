@@ -17,8 +17,8 @@ CONFIG += ENABLE_GUI_SUPPORT
 #
 # > Use Pangolin 3D library
 # > Uncomment following line:
-# CONFIG += USE_PANGOLIN
-# CONFIG += SET_PANGOLIN_HEADLESS_MODE
+CONFIG += USE_PANGOLIN
+CONFIG += SET_PANGOLIN_HEADLESS_MODE
 #
 # > No graphics is sent, only limited information
 #   about  pointcloud and AR object.

@@ -188,16 +188,16 @@ void ViewerAR::Run()
     loadCameraPose(Tcw);
 #endif
 
+    framesWithObject++;
+
     // Draw virtual things
     if (slamStatus == 2) {
       if (mBenchmarking) {
         if (!m3dObjectPoses.empty()) {
-          framesWithObject++;
-          if (framesWithObject > 15) {
+          if (framesWithObject > 20) {
             mRemove3dObject = true;
+            framesWithObject = 0;
           }
-        } else {
-          framesWithObject = 0;
         }
       }
       if (mAdd3dObject || mRemove3dObject) {
@@ -207,6 +207,7 @@ void ViewerAR::Run()
           }
           m3dObjectPoses.clear();
           fDebug << "All 3D objects erased!";
+          framesWithObject = 0;
         }
         mRemove3dObject = false;
       }
@@ -216,6 +217,7 @@ void ViewerAR::Run()
           fDebug << "New virtual cube inserted!";
           m3dObjectPoses.push_back(pPlane);
           mAdd3dObject = false;
+          framesWithObject = 0;
         }
       }
       if (!m3dObjectPoses.empty()) {        
@@ -240,7 +242,7 @@ void ViewerAR::Run()
             draw3DObject(cubesize);
             glPopMatrix();
 #endif
-            if (mBenchmarking) {
+            if (mBenchmarking && !mForceColor) {
 #ifndef DISABLE_IMAGE_OUTPUT
               glDisable(GL_DEPTH_TEST);
               glMatrixMode(GL_MODELVIEW);
@@ -250,7 +252,7 @@ void ViewerAR::Run()
               gluOrtho2D(-1000, 1000, -1000, 1000);
               glLoadIdentity();
               glBegin(GL_POLYGON);
-              glColor3f(1, 0, 1);
+              glColor3f(0, 1, 0);
               glVertex2f(-1.0, 1.0);
               glVertex2f(1.0, 1.0);
               glVertex2f(1.0, 0.5);
@@ -277,7 +279,7 @@ void ViewerAR::Run()
       gluOrtho2D(-1000, 1000, -1000, 1000);
       glLoadIdentity();
       glBegin(GL_POLYGON);
-      glColor3f(0, 1, 0);
+      glColor3f(1, 0, 1);
       glVertex2f(-1.0, 1.0);
       glVertex2f(1.0, 1.0);
       glVertex2f(1.0, 0.5);
@@ -588,9 +590,6 @@ void ViewerAR::draw3DObject(const double &size, const double x, const double y, 
   glColor4f(colorb.redF(), colorb.greenF(), colorb.blueF(), 1.0f);
   glDrawArrays(GL_TRIANGLE_STRIP, 8, 5);
   glDrawArrays(GL_TRIANGLE_STRIP, 13, 5);
-
-  //glColor4f(colorc.redF(), colorc.greenF(), colorc.blueF(), 1.0f);
-  //glDrawArrays(GL_TRIANGLE_STRIP, 16, 4);
 
   glColor4f(0, 0.8f, 0, 1.0f);
   glDrawArrays(GL_TRIANGLE_STRIP, 22, 4);

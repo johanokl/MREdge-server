@@ -217,17 +217,13 @@ void OrbSlamProcesser::process(qint32 session, quint32 frameid, cvMatPtr mat)
     if (mIdentifyColorFrame) {
       colorFrame = true;
       for (int i = 0; i < 10; i++) {
-        unsigned char * p = mat->ptr(20 * i,  5 * i);
-        if (p[0] != 252 || p[1] != 0 || p[2] != 252) {
-           colorFrame = false;
-           break;
+        unsigned char * p = mat->ptr(2,  20 * i + 20);
+        if (p[0] < 230 || p[1] > 20 || p[2] < 230) {
+          colorFrame = false;
+          break;
         }
       }
-      if (colorFrame) {
-        fDebug << "Color frame found";
-      }
     }
-    //emit sendQImage(mSession, frameid, qImageFromMat(mat->clone()));
     cv::Mat Tcw = mSLAM->TrackMonocular(mat->clone(), static_cast<double>(frameid) / 30);
     int state = mSLAM->GetTrackingState();
     vector<ORB_SLAM2::MapPoint*> vMPs = mSLAM->GetTrackedMapPoints();

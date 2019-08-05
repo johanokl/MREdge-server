@@ -16,7 +16,7 @@
 #include <QTimer>
 #include <QTime>
 
-#define WRITE_LOG_TRIGGER_TIME 58
+#define WRITE_LOG_TRIGGER_TIME 63
 
 namespace MREdge {
 

@@ -14,6 +14,8 @@
 #include <QThread>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QElapsedTimer>
+#include <QTimer>
 #include "mrserver.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -29,29 +31,29 @@ MockClient::MockClient()
 
 /**
  * @brief MockClient::start
- * @param delay
- * @param interval
- * @param repeat
+ * @param delay Milliseconds before sending the first image.
+ * @param fps Frames per seconds in output stream.
+ * @param repeat Start over when the last image in the directory has been sent.
  * @param webcam
  * @param path
  */
-void MockClient::start(unsigned long delay, unsigned long interval,
+void MockClient::start(unsigned long delay, int fps,
                        bool repeat, bool webcam, QString path,
                        bool sendCommands)
 {
   fDebug << "Adding mock client.";
-  emit startSignal(delay, interval, repeat, webcam, path, sendCommands);
+  emit startSignal(delay, fps, repeat, webcam, path, sendCommands);
 }
 
 /**
  * @brief MockClient::startThread
  * @param delay Milliseconds before sending the first image.
- * @param interval Milliseconds of waiting between the images.
+ * @param fps Frames per seconds in output stream.
  * @param repeat Start over when the last image in the directory has been sent.
  * @param webcam
  * @param path
  */
-void MockClient::startThread(unsigned long delay, unsigned long interval,
+void MockClient::startThread(unsigned long delay, int fps,
                              bool repeat, bool webcam, QString path,
                              bool sendCommands)
 {
@@ -98,38 +100,52 @@ void MockClient::startThread(unsigned long delay, unsigned long interval,
       //}
     }
   } else {
-    do {
-      if (path.isEmpty()) {
-        path = "Mock";
-      }
-      QDir directory(path);
-      fDebug << "Using images in " << directory.absolutePath();
-      if (delay && this->thread()) {
-        thread()->msleep(delay);
-      }
-      QStringList files = directory.entryList(
-            QStringList() << "*.jpg" << "*.JPG",
-            QDir::Files, QDir::Name);
-      if (files.empty()) {
-        fDebug << "No mock files in directory " << path;
+
+    if (delay && this->thread()) {
+      thread()->msleep(delay);
+    }
+    mElapsedTimer = new QElapsedTimer;
+    mElapsedTimer->start();
+    if (path.isEmpty()) {
+      path = "Mock";
+    }
+    QDir directory(path);
+    fDebug << "Using images in " << directory.absolutePath();
+    QStringList *files = new QStringList(directory.entryList(
+          QStringList() << "*.jpg" << "*.JPG",
+          QDir::Files, QDir::Name));
+    if (files->empty()) {
+      fDebug << "No mock files in directory " << path;
+      return;
+    }
+    files->sort();
+    if (fps < 1) {
+      fps = 10;
+    }
+    int interval = (double) 1000 / fps;
+    if (fps < 1) {
+      fps = 100;
+    }
+    int* ptrimagecounter = new int;
+    mRecurringTimer = new QTimer;
+    QObject::connect(mRecurringTimer, &QTimer::timeout, [=](){
+      if (!mRun || files->empty()) {
+        mRecurringTimer->stop();
         return;
       }
-      files.sort();
-      foreach (auto filename, files) {
-        imagecounter++;
-        QString fullpath = path + QDir::separator() + filename;
-        fDebug << "Mock input: " << fullpath.toLatin1();
-        QFile file(fullpath);
-        if (file.open(QIODevice::ReadOnly)) {
-          QByteArrayPtr data(new QByteArray(file.readAll()));
-          emit fileReady(getSession(), NetworkConnection::File(
-                           NetworkConnection::FileType::IMAGE, imagecounter, data));
-        }
-        if (interval && this->thread()) {
-          thread()->msleep(interval);
-        }
+      int currFrame = (mElapsedTimer->elapsed() / interval) % files->size();
+      QString filename = files->at(currFrame);
+      *ptrimagecounter += 1;
+      QString fullpath = path + QDir::separator() + filename;
+      QFile file(fullpath);
+      if (file.open(QIODevice::ReadOnly)) {
+        QByteArrayPtr data(new QByteArray(file.readAll()));
+        emit fileReady(getSession(), NetworkConnection::File(
+                         NetworkConnection::FileType::IMAGE, *ptrimagecounter, data));
       }
-    } while (repeat && mRun);
+    });
+    mRecurringTimer->setInterval(static_cast<double>(1000) / fps);
+    mRecurringTimer->start();
   }
 }
 

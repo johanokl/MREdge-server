@@ -33,8 +33,7 @@ ImageProcesser::ImageProcesser()
 cv::Mat ImageProcesser::matFromQImage(QImage img)
 {
   if (img.format() == QImage::Format_RGB32) {
-    return cv::Mat(img.height(), img.width(), CV_8UC4, img.bits(),
-                   static_cast<size_t>(img.bytesPerLine())).clone();
+    img = img.convertToFormat(QImage::Format_RGB888);
   }
   return cv::Mat(img.height(), img.width(), CV_8UC3, img.bits(),
                  static_cast<size_t>(img.bytesPerLine())).clone();
@@ -187,7 +186,8 @@ void ImageProcesser::processFile(qint32 session, NetworkConnection::File file)
            << mSkippedImages;
     mSkippedImages = 0;
   }
-  process(mSession, file.id, cvMatPtr(new cv::Mat(matFromQImage(QImage::fromData(*file.data, "JPEG")))));
+  QImage qimg = QImage::fromData(*file.data, "JPEG");
+  process(mSession, file.id, cvMatPtr(new cv::Mat(matFromQImage(qimg))));
 }
 
 /**

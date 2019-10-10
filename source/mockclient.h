@@ -12,6 +12,9 @@
 #include "networkconnection.h"
 #include <QObject>
 
+class QTimer;
+class QElapsedTimer;
+
 namespace MREdge {
 
 class MRServer;
@@ -33,17 +36,19 @@ public:
   qint32 getSession() { return mSessionId; }
   QString getHost() { return "0.0.0.0"; }
   void stop() { mRun = false; }
-  void start(unsigned long delay, unsigned long interval, bool repeat, bool webcam, QString path="", bool sendCommands=true);
+  void start(unsigned long delay, int fps, bool repeat, bool webcam, QString path="", bool sendCommands=true);
 
 private slots:
-  void startThread(unsigned long delay, unsigned long interval, bool repeat, bool webcam, QString path, bool sendCommands);
+  void startThread(unsigned long delay, int fps, bool repeat, bool webcam, QString path, bool sendCommands);
 
 signals:
-  void startSignal(unsigned long delay, unsigned long interval, bool repeat, bool webcam, QString path, bool sendCommands);
+  void startSignal(unsigned long delay, int fps, bool repeat, bool webcam, QString path, bool sendCommands);
 
 private:
   bool mRun;
   qint32 mSessionId;
+  QTimer* mRecurringTimer;
+  QElapsedTimer *mElapsedTimer;
 };
 
 }

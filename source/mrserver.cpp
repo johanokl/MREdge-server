@@ -281,7 +281,7 @@ void MRServer::addMockClient(bool useCamera, QString path)
                    this, &MRServer::newSession);
   QObject::connect(mockClient, &NetworkConnection::fileReady,
                    this, &MRServer::dataReceived);
-  mockClient->start(100, 100, true, useCamera, path, true);
+  mockClient->start(100, 30, true, useCamera, path, true);
 }
 
 /**
@@ -319,8 +319,6 @@ void MRServer::setBenchmarkingMode(bool enable)
  */
 void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
 {
-  fDebug << sessionId << QString("Data received: (type=%1, length=%2)")
-            .arg(file.type).arg(file.data.isNull() ? 0 : file.data->length());
   mSessionsListmutex.lock();
   Session *session = sessions.value(sessionId);
   mSessionsListmutex.unlock();
@@ -385,7 +383,7 @@ void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
       } else {
         destPort = 0;
       }
-      if (destPort > 0) {
+      if (destPort > 0 && session->videotransmitter) {
         session->videotransmitter->startStream(format, destPort);
       }
     }
@@ -443,6 +441,8 @@ void MRServer::dataReceived(qint32 sessionId, NetworkConnection::File file)
       }
       if (session->imageprocesser) {
         session->imageprocesser->setConfig(jsonObject);
+      }
+      if (session->videotransmitter) {
         session->videotransmitter->setImageSize(QSize(width, height));
       }
     }
@@ -691,7 +691,10 @@ void MRServer::removeSession(qint32 sessionId)
     fDebug << "+========================================+";
     auto imagesprocessortimes = session->imageprocesser->getProcessingTimes();
     auto mjpegsenttimes = mTcpCon->getProcessingTimes(sessionId);
-    auto videosenttimes = session->videotransmitter->getProcessingTimes();
+    QMap<quint32, qint64>  videosenttimes;
+    if (session->videotransmitter) {
+      videosenttimes = session->videotransmitter->getProcessingTimes();
+    }
     auto videoarrivedtimes = session->videoreceiver->getProcessingTimes();
     if (mjpegsenttimes.isEmpty()) {
       mjpegsenttimes = mUdpCon->getProcessingTimes(sessionId);
